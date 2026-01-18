@@ -1,0 +1,14 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@jeepneygo/core": ["../../packages/core/src"],
+      "@jeepneygo/core/*": ["../../packages/core/src/*"],
+      "@jeepneygo/ui": ["../../packages/ui/src"],
+      "@jeepneygo/ui/*": ["../../packages/ui/src/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+}

@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "JeepneyGo",
+    "slug": "jeepneygo-commuter",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "jeepneygo",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFB800"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.jeepneygo.commuter",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "JeepneyGo uses your location to show nearby jeepney stops and calculate ETAs."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFB800"
+      },
+      "package": "com.jeepneygo.commuter",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "JeepneyGo uses your location to show nearby jeepney stops and calculate ETAs."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

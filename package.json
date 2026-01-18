@@ -1,0 +1,22 @@
+{
+  "name": "jeepneygo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "driver": "yarn workspace @jeepneygo/driver start",
+    "commuter": "yarn workspace @jeepneygo/commuter start",
+    "driver:android": "yarn workspace @jeepneygo/driver android",
+    "driver:ios": "yarn workspace @jeepneygo/driver ios",
+    "commuter:android": "yarn workspace @jeepneygo/commuter android",
+    "commuter:ios": "yarn workspace @jeepneygo/commuter ios",
+    "lint": "yarn workspaces run lint",
+    "typecheck": "yarn workspaces run typecheck"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

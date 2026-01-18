@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "JeepneyGo Driver",
+    "slug": "jeepneygo-driver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "jeepneygo-driver",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFB800"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.jeepneygo.driver",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "JeepneyGo needs your location to broadcast your jeepney position to commuters.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "JeepneyGo needs background location access to continue tracking while the app is minimized.",
+        "UIBackgroundModes": ["location"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFB800"
+      },
+      "package": "com.jeepneygo.driver",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "JeepneyGo needs your location to broadcast your jeepney position to commuters.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
