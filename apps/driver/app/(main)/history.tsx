@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
-import { Text, useTheme, ActivityIndicator } from 'react-native-paper';
-import { ScreenContainer, Card } from '@jeepneygo/ui';
+import { Text, useTheme } from 'react-native-paper';
+import { ScreenContainer, Card, SkeletonList, EmptyState } from '@jeepneygo/ui';
 import { useAuthStore, useTripHistory } from '@jeepneygo/core';
 
 export default function HistoryScreen() {
@@ -35,10 +35,10 @@ export default function HistoryScreen() {
     const start = new Date(startedAt).getTime();
     const end = new Date(endedAt).getTime();
     const seconds = Math.floor((end - start) / 1000);
-    
+
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
-    
+
     if (hrs > 0) {
       return `${hrs}h ${mins}m`;
     }
@@ -46,25 +46,21 @@ export default function HistoryScreen() {
   };
 
   const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Text variant="titleMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-        No trips yet
-      </Text>
-      <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>
-        Your completed trips will appear here
-      </Text>
-    </View>
+    <EmptyState type="no-history" />
   );
 
   if (isLoading) {
     return (
       <ScreenContainer>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text variant="bodyMedium" style={{ marginTop: 16, color: theme.colors.onSurfaceVariant }}>
-            Loading trip history...
+        <View style={styles.header}>
+          <Text variant="headlineSmall" style={styles.title}>
+            Trip History
+          </Text>
+          <Text variant="bodyMedium" style={styles.subtitle}>
+            Loading your trips...
           </Text>
         </View>
+        <SkeletonList count={5} cardProps={{ lines: 3 }} style={styles.skeletonList} />
       </ScreenContainer>
     );
   }
@@ -101,11 +97,11 @@ export default function HistoryScreen() {
                   {formatDate(item.ended_at)}
                 </Text>
               </View>
-              
+
               <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}>
                 {item.route?.name}
               </Text>
-              
+
               <View style={styles.tripStats}>
                 <View style={styles.tripStat}>
                   <Text variant="titleMedium" style={{ color: theme.colors.primary, fontWeight: 'bold' }}>
@@ -199,5 +195,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  skeletonList: {
+    paddingHorizontal: 16,
   },
 });
