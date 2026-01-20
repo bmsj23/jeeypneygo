@@ -1,9 +1,9 @@
-import React, { forwardRef, useCallback, useMemo } from 'react';
+import React, { forwardRef, useCallback, useMemo, useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text, useTheme, IconButton, Divider, Chip } from 'react-native-paper';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import type { ActiveTripWithDetails } from '@jeepneygo/core';
-import { getTimeAgo, isLocationStale } from '@jeepneygo/core';
+import { getTimeAgo, isLocationStale, supabase } from '@jeepneygo/core';
 
 interface JeepneyDetailsSheetProps {
   trip: ActiveTripWithDetails | null;
@@ -15,17 +15,63 @@ export const JeepneyDetailsSheet = forwardRef<BottomSheet, JeepneyDetailsSheetPr
     const theme = useTheme();
     const snapPoints = useMemo(() => ['35%'], []);
 
+    // local state for real-time updates
+    const [liveTrip, setLiveTrip] = useState<ActiveTripWithDetails | null>(trip);
+
+    // sync with prop when trip changes
+    useEffect(() => {
+      setLiveTrip(trip);
+    }, [trip]);
+
+    // subscribe to real-time updates for this specific trip
+    useEffect(() => {
+      if (!trip?.id) return;
+
+      const channel = supabase
+        .channel(`trip-details-${trip.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'active_trips',
+            filter: `id=eq.${trip.id}`,
+          },
+          (payload) => {
+            // merge updated fields with existing trip data to preserve relations
+            setLiveTrip((prev) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                ...payload.new,
+                // preserve joined relations
+                vehicle: prev.vehicle,
+                driver: prev.driver,
+                route: prev.route,
+              } as ActiveTripWithDetails;
+            });
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }, [trip?.id]);
+
     const handleClose = useCallback(() => {
       onClose();
     }, [onClose]);
 
-    if (!trip) return null;
+    const displayTrip = liveTrip || trip;
 
-    const routeColor = trip.route?.color || '#FFB800';
-    const isStale = trip.last_updated ? isLocationStale(trip.last_updated) : false;
-    const lastUpdated = trip.last_updated ? getTimeAgo(trip.last_updated) : 'Unknown';
-    const passengerCount = trip.passenger_count || 0;
-    const maxCapacity = trip.vehicle?.capacity || 20;
+    if (!displayTrip) return null;
+
+    const routeColor = displayTrip.route?.color || '#FFB800';
+    const isStale = displayTrip.last_updated ? isLocationStale(displayTrip.last_updated) : false;
+    const lastUpdated = displayTrip.last_updated ? getTimeAgo(displayTrip.last_updated) : 'Unknown';
+    const passengerCount = displayTrip.passenger_count || 0;
+    const maxCapacity = displayTrip.vehicle?.capacity || 20;
     const availableSeats = Math.max(0, maxCapacity - passengerCount);
 
     // seat availability indicator
@@ -62,10 +108,10 @@ export const JeepneyDetailsSheet = forwardRef<BottomSheet, JeepneyDetailsSheetPr
               <View style={[styles.routeIndicator, { backgroundColor: routeColor }]} />
               <View>
                 <Text variant="titleMedium" style={styles.routeName}>
-                  {trip.route?.name || 'Unknown Route'}
+                  {displayTrip.route?.name || 'Unknown Route'}
                 </Text>
                 <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                  {trip.vehicle?.plate_number || 'No plate'}
+                  {displayTrip.vehicle?.plate_number || 'No plate'}
                 </Text>
               </View>
             </View>
@@ -131,7 +177,7 @@ export const JeepneyDetailsSheet = forwardRef<BottomSheet, JeepneyDetailsSheetPr
               <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
                 Driver
               </Text>
-              <Text variant="bodyMedium">{trip.driver?.display_name || 'Unknown'}</Text>
+              <Text variant="bodyMedium">{displayTrip.driver?.display_name || 'Unknown'}</Text>
             </View>
           </View>
         </BottomSheetView>

@@ -1,7 +1,7 @@
-import React, { memo } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { memo, useEffect, useRef } from 'react';
+import { View, StyleSheet, Animated } from 'react-native';
 import { Text } from 'react-native-paper';
-import { Marker } from 'react-native-maps';
+import { Marker, AnimatedRegion, MarkerAnimated } from 'react-native-maps';
 import type { ActiveTripWithDetails } from '@jeepneygo/core';
 
 interface JeepneyMarkerProps {
@@ -10,32 +10,95 @@ interface JeepneyMarkerProps {
   onPress?: (trip: ActiveTripWithDetails) => void;
 }
 
+// animation duration for smooth marker movement (ms)
+const ANIMATION_DURATION = 500;
+
 function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarkerProps) {
   const routeColor = trip.route?.color || '#FFB800';
   const heading = trip.heading || 0;
+
+  // animated region for smooth position transitions
+  const animatedCoordinate = useRef(
+    new AnimatedRegion({
+      latitude: trip.current_latitude || 0,
+      longitude: trip.current_longitude || 0,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    })
+  ).current;
+
+  // animate heading rotation
+  const animatedHeading = useRef(new Animated.Value(heading)).current;
+
+  // previous coordinates for comparison
+  const prevCoordsRef = useRef({
+    latitude: trip.current_latitude,
+    longitude: trip.current_longitude,
+    heading: heading,
+  });
+
+  // animate to new position when coordinates change
+  useEffect(() => {
+    const prevCoords = prevCoordsRef.current;
+    const newLat = trip.current_latitude || 0;
+    const newLng = trip.current_longitude || 0;
+    const newHeading = trip.heading || 0;
+
+    // only animate if coordinates actually changed
+    const coordsChanged =
+      prevCoords.latitude !== newLat || prevCoords.longitude !== newLng;
+    const headingChanged = prevCoords.heading !== newHeading;
+
+    if (coordsChanged) {
+      // use animateTo for animated region which is the correct method
+      animatedCoordinate.timing({
+        latitude: newLat,
+        longitude: newLng,
+        duration: ANIMATION_DURATION,
+        useNativeDriver: false,
+      } as any).start();
+    }
+
+    if (headingChanged) {
+      Animated.timing(animatedHeading, {
+        toValue: newHeading,
+        duration: ANIMATION_DURATION,
+        useNativeDriver: true,
+      }).start();
+    }
+
+    prevCoordsRef.current = {
+      latitude: newLat,
+      longitude: newLng,
+      heading: newHeading,
+    };
+  }, [trip.current_latitude, trip.current_longitude, trip.heading, animatedCoordinate, animatedHeading]);
 
   if (!trip.current_latitude || !trip.current_longitude) {
     return null;
   }
 
+  // interpolate heading for rotation transform
+  const rotation = animatedHeading.interpolate({
+    inputRange: [0, 360],
+    outputRange: ['0deg', '360deg'],
+  });
+
   return (
-    <Marker
-      coordinate={{
-        latitude: trip.current_latitude,
-        longitude: trip.current_longitude,
-      }}
+    <MarkerAnimated
+      coordinate={animatedCoordinate}
       onPress={() => onPress?.(trip)}
-      tracksViewChanges={false}
+      tracksViewChanges={true}
       anchor={{ x: 0.5, y: 0.5 }}
     >
       <View style={[styles.container, isStale && styles.stale]}>
-        {/* direction indicator */}
-        <View
+        {/* direction indicator with animated rotation */}
+        <Animated.View
           style={[
             styles.directionArrow,
             {
               borderBottomColor: routeColor,
-              transform: [{ rotate: `${heading - 90}deg` }],
+              transform: [{ rotate: rotation }],
             },
           ]}
         />
@@ -48,7 +111,7 @@ function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarke
           <Text style={styles.passengerText}>{trip.passenger_count || 0}</Text>
         </View>
       </View>
-    </Marker>
+    </MarkerAnimated>
   );
 }
 
