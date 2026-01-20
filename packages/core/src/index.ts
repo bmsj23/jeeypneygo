@@ -20,10 +20,12 @@ export * from './hooks/use-network-status';
 export * from './hooks/use-stops';
 export * from './hooks/use-favorites';
 export * from './hooks/use-user-location';
+export * from './hooks/use-driver-spacing';
 
 // utils
 export * from './utils/eta-calculator';
 export * from './utils/fare-calculator';
+export * from './utils/driver-spacing';
 
 // providers
 export * from './providers/query-provider';
