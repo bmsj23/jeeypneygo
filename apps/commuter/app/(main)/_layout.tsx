@@ -1,9 +1,44 @@
 import { Tabs } from 'expo-router';
+import { View, StyleSheet, Platform } from 'react-native';
 import { useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// modern floating tab bar icon with indicator
+function TabBarIcon({
+  name,
+  nameFocused,
+  color,
+  focused,
+}: {
+  name: keyof typeof MaterialCommunityIcons.glyphMap;
+  nameFocused: keyof typeof MaterialCommunityIcons.glyphMap;
+  color: string;
+  focused: boolean;
+}) {
+  const theme = useTheme();
+
+  return (
+    <View style={styles.iconContainer}>
+      <View
+        style={[
+          styles.iconBackground,
+          focused && { backgroundColor: `${theme.colors.primary}15` },
+        ]}
+      >
+        <MaterialCommunityIcons name={focused ? nameFocused : name} size={24} color={color} />
+      </View>
+      {focused && <View style={[styles.activeIndicator, { backgroundColor: theme.colors.primary }]} />}
+    </View>
+  );
+}
 
 export default function MainLayout() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+
+  // ensure minimum padding for ios home indicator
+  const bottomPadding = Math.max(insets.bottom, 8);
 
   return (
     <Tabs
@@ -13,15 +48,29 @@ export default function MainLayout() {
         tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
-          borderTopWidth: 1,
-          borderTopColor: theme.colors.outlineVariant,
-          height: 60,
-          paddingBottom: 8,
+          borderTopWidth: 0,
+          height: 64 + bottomPadding,
+          paddingBottom: bottomPadding,
           paddingTop: 8,
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -4 },
+              shadowOpacity: 0.05,
+              shadowRadius: 12,
+            },
+            android: {
+              elevation: 8,
+            },
+          }),
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
+          fontSize: 11,
+          fontWeight: '600',
+          marginTop: 2,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 4,
         },
       }}
     >
@@ -30,11 +79,7 @@ export default function MainLayout() {
         options={{
           title: 'Map',
           tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? 'map' : 'map-outline'}
-              size={24}
-              color={color}
-            />
+            <TabBarIcon name="map-outline" nameFocused="map" color={color} focused={focused} />
           ),
         }}
       />
@@ -43,24 +88,16 @@ export default function MainLayout() {
         options={{
           title: 'Routes',
           tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? 'bus' : 'bus'}
-              size={24}
-              color={color}
-            />
+            <TabBarIcon name="bus" nameFocused="bus" color={color} focused={focused} />
           ),
         }}
       />
       <Tabs.Screen
         name="favorites"
         options={{
-          title: 'Favorites',
+          title: 'Saved',
           tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? 'heart' : 'heart-outline'}
-              size={24}
-              color={color}
-            />
+            <TabBarIcon name="heart-outline" nameFocused="heart" color={color} focused={focused} />
           ),
         }}
       />
@@ -69,11 +106,7 @@ export default function MainLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? 'account' : 'account-outline'}
-              size={24}
-              color={color}
-            />
+            <TabBarIcon name="account-outline" nameFocused="account" color={color} focused={focused} />
           ),
         }}
       />
@@ -93,3 +126,24 @@ export default function MainLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 48,
+  },
+  iconBackground: {
+    width: 40,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeIndicator: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 4,
+  },
+});
