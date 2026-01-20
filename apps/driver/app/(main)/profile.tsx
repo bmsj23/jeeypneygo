@@ -52,6 +52,15 @@ export default function ProfileScreen() {
 
       <Card style={styles.section}>
         <List.Item
+          title="Trip History"
+          description="View your past trips"
+          left={(props) => <List.Icon {...props} icon="history" color={theme.colors.primary} />}
+          right={(props) => <List.Icon {...props} icon="chevron-right" />}
+          onPress={() => router.push('/(main)/history')}
+          style={styles.listItem}
+        />
+        <Divider />
+        <List.Item
           title="Edit Profile"
           description="Update your information"
           left={(props) => <List.Icon {...props} icon="account-edit" />}
@@ -119,7 +128,7 @@ export default function ProfileScreen() {
           Sign Out
         </Button>
         <Text variant="bodySmall" style={styles.version}>
-          JeepneyGo Driver v1.0.0
+          JeepneyGo Driver v1.6.0
         </Text>
       </View>
     </ScreenContainer>
