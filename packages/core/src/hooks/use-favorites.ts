@@ -70,7 +70,8 @@ export function useFavorites(): UseFavoritesReturn {
       if (!user?.id) return false;
 
       try {
-        const { error: insertError } = await supabase.from('user_favorites').insert({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: insertError } = await (supabase.from('user_favorites') as any).insert({
           user_id: user.id,
           stop_id: stopId,
         });

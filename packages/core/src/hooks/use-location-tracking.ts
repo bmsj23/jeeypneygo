@@ -42,7 +42,7 @@ export function useLocationTracking(
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isTrackingRef = useRef(false);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
@@ -50,11 +50,11 @@ export function useLocationTracking(
       const { status } = await Location.requestForegroundPermissionsAsync();
       const granted = status === 'granted';
       setHasPermission(granted);
-      
+
       if (!granted) {
         setError(new Error('Location permission denied'));
       }
-      
+
       return granted;
     } catch (err) {
       const error = err as Error;
@@ -94,7 +94,7 @@ export function useLocationTracking(
 
   const startTracking = useCallback(() => {
     if (isTrackingRef.current) return;
-    
+
     isTrackingRef.current = true;
     setIsTracking(true);
 
