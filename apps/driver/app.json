@@ -2,7 +2,7 @@
   "expo": {
     "name": "JeepneyGo Driver",
     "slug": "jeepneygo-driver",
-    "version": "1.0.0",
+    "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFB800"
+      "backgroundColor": "#1565C0"
     },
     "ios": {
       "supportsTablet": false,
@@ -25,7 +25,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFB800"
+        "backgroundColor": "#1565C0"
       },
       "package": "com.jeepneygo.driver",
       "permissions": [
