@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet, FlatList, Alert } from 'react-native';
 import { Text, useTheme, IconButton, Portal, Modal, ActivityIndicator, Switch } from 'react-native-paper';
 import { Button, ScreenContainer, Card } from '@jeepneygo/ui';
@@ -18,7 +18,7 @@ type ScreenState = 'route-select' | 'active-trip' | 'trip-summary';
 export default function TripScreen() {
   const theme = useTheme();
   const user = useAuthStore((state) => state.user);
-  
+
   // trip store
   const {
     activeTrip,
@@ -39,7 +39,7 @@ export default function TripScreen() {
   const { routes, isLoading: routesLoading } = useRoutes({ includeStops: true });
   const { vehicle, isLoading: vehicleLoading } = useDriverVehicle(user?.id);
   const { isOnline, status: networkStatus } = useNetworkStatus();
-  
+
   // local state
   const [screenState, setScreenState] = useState<ScreenState>('route-select');
   const [tripSummary, setTripSummary] = useState<TripSummary | null>(null);
@@ -49,15 +49,27 @@ export default function TripScreen() {
 
   // location tracking - enabled on route selection screen OR during active trip
   const shouldTrackLocation = screenState === 'route-select' || (activeTrip !== null && activeTrip.status === 'active');
-  
+
+  // use refs for stable callback to prevent infinite update loops
+  const activeTripRef = useRef(activeTrip);
+  const updateLocationRef = useRef(updateLocation);
+
+  useEffect(() => {
+    activeTripRef.current = activeTrip;
+    updateLocationRef.current = updateLocation;
+  });
+
+  // stable callback that uses refs instead of direct dependencies
+  const handleLocationUpdate = useCallback((location: { latitude: number; longitude: number; heading: number; speed: number }) => {
+    if (activeTripRef.current) {
+      updateLocationRef.current(location.latitude, location.longitude, location.heading, location.speed);
+    }
+  }, []);
+
   const { currentLocation, hasPermission, requestPermission, isTracking } = useLocationTracking({
     enabled: shouldTrackLocation,
     intervalMs: 10000,
-    onLocationUpdate: useCallback((location: { latitude: number; longitude: number; heading: number; speed: number }) => {
-      if (activeTrip) {
-        updateLocation(location.latitude, location.longitude, location.heading, location.speed);
-      }
-    }, [activeTrip, updateLocation]),
+    onLocationUpdate: handleLocationUpdate,
   });
 
   // request location permission on mount
@@ -87,20 +99,20 @@ export default function TripScreen() {
 
   // trip duration timer
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    
+    let interval: ReturnType<typeof setInterval> | null = null;
+
     if (activeTrip) {
       const startTime = new Date(activeTrip.started_at).getTime();
-      
+
       const updateDuration = () => {
         const now = Date.now();
         setTripDuration(Math.floor((now - startTime) / 1000));
       };
-      
+
       updateDuration();
       interval = setInterval(updateDuration, 1000);
     }
-    
+
     return () => {
       if (interval) clearInterval(interval);
     };
@@ -110,7 +122,7 @@ export default function TripScreen() {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     if (hrs > 0) {
       return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
@@ -142,7 +154,7 @@ export default function TripScreen() {
     }
 
     // if location not available yet, try to get it
-    let locationToUse = currentLocation;
+    let locationToUse: { latitude: number; longitude: number; heading: number; speed: number } | null = currentLocation;
     if (!locationToUse) {
       setIsGettingLocation(true);
       try {
@@ -162,6 +174,11 @@ export default function TripScreen() {
         return;
       }
       setIsGettingLocation(false);
+    }
+
+    if (!locationToUse) {
+      Alert.alert('Location Error', 'Unable to get your current location. Please try again.');
+      return;
     }
 
     setSelectedRoute(route);
@@ -215,7 +232,7 @@ export default function TripScreen() {
 
   const handleTogglePause = async () => {
     if (!activeTrip) return;
-    
+
     if (activeTrip.status === 'paused') {
       await resumeTrip();
     } else {
@@ -242,7 +259,7 @@ export default function TripScreen() {
         <Text variant="bodyMedium" style={styles.subtitle}>
           Select your route to begin
         </Text>
-        
+
         {/* status indicators */}
         <View style={styles.statusRow}>
           {/* gps status */}
@@ -261,7 +278,7 @@ export default function TripScreen() {
               </Text>
             </View>
           ) : null}
-          
+
           {/* connection status */}
           <View style={styles.locationStatus}>
             <View style={[styles.statusDot, { backgroundColor: isOnline ? '#4CAF50' : '#F44336' }]} />
@@ -417,15 +434,15 @@ export default function TripScreen() {
               {selectedRoute?.name || 'Unknown Route'}
             </Text>
           </View>
-          <View style={[styles.statusBadge, { 
-            backgroundColor: activeTrip?.status === 'paused' 
-              ? theme.colors.errorContainer 
-              : '#E8F5E9' 
+          <View style={[styles.statusBadge, {
+            backgroundColor: activeTrip?.status === 'paused'
+              ? theme.colors.errorContainer
+              : '#E8F5E9'
           }]}>
-            <Text variant="labelSmall" style={{ 
-              color: activeTrip?.status === 'paused' 
-                ? theme.colors.onErrorContainer 
-                : '#4CAF50' 
+            <Text variant="labelSmall" style={{
+              color: activeTrip?.status === 'paused'
+                ? theme.colors.onErrorContainer
+                : '#4CAF50'
             }}>
               {activeTrip?.status === 'paused' ? 'PAUSED' : 'ACTIVE'}
             </Text>
@@ -484,8 +501,8 @@ export default function TripScreen() {
             Location Status
           </Text>
           <View style={styles.locationInfo}>
-            <View style={[styles.locationDot, { 
-              backgroundColor: isTracking ? '#4CAF50' : theme.colors.error 
+            <View style={[styles.locationDot, {
+              backgroundColor: isTracking ? '#4CAF50' : theme.colors.error
             }]} />
             <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
               {isTracking ? 'GPS Active - Updating every 10s' : 'GPS Inactive'}
