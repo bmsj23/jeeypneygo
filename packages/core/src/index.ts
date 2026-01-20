@@ -1,6 +1,7 @@
 // types
 export * from './types/database';
 export * from './types/models';
+export * from './types/spacing';
 
 // stores
 export * from './stores/auth-store';

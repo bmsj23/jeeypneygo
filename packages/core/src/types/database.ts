@@ -1,6 +1,4 @@
 // placeholder for supabase generated types
-// run: npx supabase gen types typescript --project-id <your-project-id> > packages/core/src/types/database.ts
-
 export type Json =
   | string
   | number
@@ -90,6 +88,8 @@ export interface Database {
           operating_start: string;
           operating_end: string;
           is_active: boolean;
+          polyline: string | null;
+          waypoints: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -103,6 +103,8 @@ export interface Database {
           operating_start?: string;
           operating_end?: string;
           is_active?: boolean;
+          polyline?: string | null;
+          waypoints?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -116,6 +118,8 @@ export interface Database {
           operating_start?: string;
           operating_end?: string;
           is_active?: boolean;
+          polyline?: string | null;
+          waypoints?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
