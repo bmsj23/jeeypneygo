@@ -4,7 +4,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 import type { ActiveTrip, Route, Vehicle } from '../types/models';
 
-// async storage adapter for trip persistence
 const tripStorage: StateStorage = {
   getItem: async (name: string) => {
     return await AsyncStorage.getItem(name);
@@ -17,6 +16,16 @@ const tripStorage: StateStorage = {
   },
 };
 
+const REGULAR_FARE = 13;
+const DISCOUNTED_FARE = 10;
+
+export interface FareEntry {
+  id: string;
+  type: 'regular' | 'discounted';
+  amount: number;
+  timestamp: number;
+}
+
 interface TripState {
   activeTrip: ActiveTrip | null;
   selectedRoute: Route | null;
@@ -25,6 +34,10 @@ interface TripState {
   isEndingTrip: boolean;
   tripStartTime: number | null;
   error: Error | null;
+  fareEntries: FareEntry[];
+  totalFare: number;
+  regularPassengers: number;
+  discountedPassengers: number;
 }
 
 interface TripActions {
@@ -38,6 +51,9 @@ interface TripActions {
   endTrip: () => Promise<{ success: boolean; tripSummary?: TripSummary; error?: Error }>;
   clearError: () => void;
   reset: () => void;
+  logFare: (type: 'regular' | 'discounted') => void;
+  undoLastFare: () => void;
+  clearFares: () => void;
 }
 
 interface StartTripParams {
@@ -54,6 +70,10 @@ export interface TripSummary {
   routeName: string;
   startedAt: string;
   endedAt: string;
+  totalFare: number;
+  regularPassengers: number;
+  discountedPassengers: number;
+  grossEarnings: number;
 }
 
 type TripStore = TripState & TripActions;
@@ -66,6 +86,10 @@ const initialState: TripState = {
   isEndingTrip: false,
   tripStartTime: null,
   error: null,
+  fareEntries: [],
+  totalFare: 0,
+  regularPassengers: 0,
+  discountedPassengers: 0,
 };
 
 export const useTripStore = create<TripStore>()(
@@ -74,12 +98,71 @@ export const useTripStore = create<TripStore>()(
       ...initialState,
 
       setSelectedRoute: (route) => set({ selectedRoute: route }),
-      
+
       setVehicle: (vehicle) => set({ vehicle }),
+
+      logFare: (type) => {
+        const amount = type === 'regular' ? REGULAR_FARE : DISCOUNTED_FARE;
+        const entry: FareEntry = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          type,
+          amount,
+          timestamp: Date.now(),
+        };
+
+        set((state) => ({
+          fareEntries: [...state.fareEntries, entry],
+          totalFare: state.totalFare + amount,
+          regularPassengers: state.regularPassengers + (type === 'regular' ? 1 : 0),
+          discountedPassengers: state.discountedPassengers + (type === 'discounted' ? 1 : 0),
+        }));
+
+        const { activeTrip, regularPassengers, discountedPassengers } = get();
+        if (activeTrip) {
+          const newCount = regularPassengers + discountedPassengers + 1;
+          get().updatePassengerCount(newCount);
+        }
+      },
+
+      undoLastFare: () => {
+        const { fareEntries } = get();
+        if (fareEntries.length === 0) return;
+
+        const lastEntry = fareEntries[fareEntries.length - 1];
+
+        set((state) => ({
+          fareEntries: state.fareEntries.slice(0, -1),
+          totalFare: state.totalFare - lastEntry.amount,
+          regularPassengers: state.regularPassengers - (lastEntry.type === 'regular' ? 1 : 0),
+          discountedPassengers: state.discountedPassengers - (lastEntry.type === 'discounted' ? 1 : 0),
+        }));
+
+        const { activeTrip, regularPassengers, discountedPassengers } = get();
+        if (activeTrip) {
+          const newCount = regularPassengers + discountedPassengers - 1;
+          get().updatePassengerCount(Math.max(0, newCount));
+        }
+      },
+
+      clearFares: () => {
+        set({
+          fareEntries: [],
+          totalFare: 0,
+          regularPassengers: 0,
+          discountedPassengers: 0,
+        });
+      },
 
       startTrip: async ({ driverId, vehicleId, routeId, latitude, longitude }) => {
         try {
           set({ isStartingTrip: true, error: null });
+
+          set({
+            fareEntries: [],
+            totalFare: 0,
+            regularPassengers: 0,
+            discountedPassengers: 0,
+          });
 
           const tripData = {
             driver_id: driverId,
@@ -124,7 +207,6 @@ export const useTripStore = create<TripStore>()(
           return { success: false, error: new Error('No active trip') };
         }
 
-        // clamp count to valid range
         const maxCapacity = vehicle?.capacity ?? 20;
         const clampedCount = Math.max(0, Math.min(count, maxCapacity));
 
@@ -247,7 +329,7 @@ export const useTripStore = create<TripStore>()(
       },
 
       endTrip: async () => {
-        const { activeTrip, selectedRoute, tripStartTime } = get();
+        const { activeTrip, selectedRoute, tripStartTime, totalFare, regularPassengers, discountedPassengers } = get();
         if (!activeTrip) {
           return { success: false, error: new Error('No active trip') };
         }
@@ -258,15 +340,20 @@ export const useTripStore = create<TripStore>()(
           const endedAt = new Date().toISOString();
           const startedAt = activeTrip.started_at;
 
-          // insert into trip_history
+          const grossEarnings = totalFare;
+
           const historyData = {
             vehicle_id: activeTrip.vehicle_id,
             driver_id: activeTrip.driver_id,
             route_id: activeTrip.route_id,
             started_at: startedAt,
             ended_at: endedAt,
-            total_passengers: activeTrip.passenger_count,
+            total_passengers: regularPassengers + discountedPassengers,
             distance_km: 0,
+            total_fare: totalFare,
+            regular_passengers: regularPassengers,
+            discounted_passengers: discountedPassengers,
+            gross_earnings: grossEarnings,
           };
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -278,7 +365,6 @@ export const useTripStore = create<TripStore>()(
             throw new Error(historyError.message);
           }
 
-          // delete from active_trips
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { error: deleteError } = await (supabase as any)
             .from('active_trips')
@@ -289,17 +375,20 @@ export const useTripStore = create<TripStore>()(
             throw new Error(deleteError.message);
           }
 
-          // calculate duration
-          const duration = tripStartTime 
+          const duration = tripStartTime
             ? Math.floor((Date.now() - tripStartTime) / 1000)
             : Math.floor((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000);
 
           const tripSummary: TripSummary = {
             duration,
-            totalPassengers: activeTrip.passenger_count,
+            totalPassengers: regularPassengers + discountedPassengers,
             routeName: selectedRoute?.name || 'Unknown Route',
             startedAt,
             endedAt,
+            totalFare,
+            regularPassengers,
+            discountedPassengers,
+            grossEarnings,
           };
 
           set({
@@ -326,6 +415,10 @@ export const useTripStore = create<TripStore>()(
         activeTrip: state.activeTrip,
         selectedRoute: state.selectedRoute,
         tripStartTime: state.tripStartTime,
+        fareEntries: state.fareEntries,
+        totalFare: state.totalFare,
+        regularPassengers: state.regularPassengers,
+        discountedPassengers: state.discountedPassengers,
       }),
     }
   )
