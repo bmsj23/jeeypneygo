@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Text, useTheme, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { TripTimer, FareLoggerCompact } from '@jeepneygo/ui';
+import { TripTimer, FareEntryPanel } from '@jeepneygo/ui';
 import type { ActiveTrip, FareEntry } from '@jeepneygo/core';
 
 interface ActiveTripControlsProps {
@@ -13,12 +13,15 @@ interface ActiveTripControlsProps {
   totalFare: number;
   regularPassengers: number;
   discountedPassengers: number;
+  currentPassengersOnboard: number;
   fareEntries: FareEntry[];
   isEndingTrip: boolean;
-  onLogFare: (type: 'regular' | 'discounted') => void;
+  onAddFare: (amount: number) => void;
   onUndoLastFare: () => void;
+  onDecrementPassenger: () => void;
   onTogglePause: () => void;
   onEndTrip: () => void;
+  onFareEntryModeChange?: (isEntering: boolean) => void;
 }
 
 export function ActiveTripControls({
@@ -29,15 +32,20 @@ export function ActiveTripControls({
   totalFare,
   regularPassengers,
   discountedPassengers,
+  currentPassengersOnboard,
   fareEntries,
   isEndingTrip,
-  onLogFare,
+  onAddFare,
   onUndoLastFare,
+  onDecrementPassenger,
   onTogglePause,
   onEndTrip,
+  onFareEntryModeChange,
 }: ActiveTripControlsProps) {
   const theme = useTheme();
   const isPaused = activeTrip?.status === 'paused';
+  // use currentPassengersOnboard for display (actual passengers in vehicle)
+  // regularPassengers + discountedPassengers is total served (for stats)
 
   return (
     <View>
@@ -49,19 +57,16 @@ export function ActiveTripControls({
       />
 
       <View style={styles.fareSection}>
-        <FareLoggerCompact
-          onLogFare={onLogFare}
+        <FareEntryPanel
           totalFare={totalFare}
-          regularCount={regularPassengers}
-          discountedCount={discountedPassengers}
+          passengerCount={currentPassengersOnboard}
+          onAddFare={onAddFare}
+          onUndo={onUndoLastFare}
+          onDecrementPassenger={onDecrementPassenger}
+          canUndo={fareEntries.length > 0}
           disabled={isPaused}
+          onModeChange={onFareEntryModeChange}
         />
-        {fareEntries.length > 0 && (
-          <Pressable onPress={onUndoLastFare} style={styles.undoButton}>
-            <MaterialCommunityIcons name="undo" size={16} color="#F59E0B" />
-            <Text style={styles.undoText}>Undo last</Text>
-          </Pressable>
-        )}
       </View>
 
       <View style={styles.actions}>
@@ -110,19 +115,6 @@ const styles = StyleSheet.create({
   fareSection: {
     marginTop: 16,
     marginBottom: 16,
-  },
-  undoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    marginTop: 10,
-    paddingVertical: 6,
-  },
-  undoText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#F59E0B',
   },
   actions: {
     flexDirection: 'row',
