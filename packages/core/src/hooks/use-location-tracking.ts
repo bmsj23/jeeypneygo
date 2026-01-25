@@ -66,8 +66,22 @@ export function useLocationTracking(
 
   const getLocation = useCallback(async (): Promise<LocationData | null> => {
     try {
+      const lastKnown = await Location.getLastKnownPositionAsync();
+      if (lastKnown) {
+        const lastKnownData: LocationData = {
+          latitude: lastKnown.coords.latitude,
+          longitude: lastKnown.coords.longitude,
+          heading: lastKnown.coords.heading ?? 0,
+          speed: lastKnown.coords.speed ?? 0,
+          accuracy: lastKnown.coords.accuracy,
+          timestamp: lastKnown.timestamp,
+        };
+        setCurrentLocation(lastKnownData);
+        onLocationUpdate?.(lastKnownData);
+      }
+
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+        accuracy: Location.Accuracy.Balanced,
       });
 
       const locationData: LocationData = {
@@ -98,10 +112,8 @@ export function useLocationTracking(
     isTrackingRef.current = true;
     setIsTracking(true);
 
-    // get initial location immediately
     getLocation();
 
-    // set up interval for subsequent updates
     intervalRef.current = setInterval(() => {
       if (isTrackingRef.current) {
         getLocation();
@@ -119,7 +131,6 @@ export function useLocationTracking(
     }
   }, []);
 
-  // auto-start tracking when enabled changes
   useEffect(() => {
     if (enabled && hasPermission) {
       startTracking();
@@ -132,7 +143,6 @@ export function useLocationTracking(
     };
   }, [enabled, hasPermission, startTracking, stopTracking]);
 
-  // check permission on mount
   useEffect(() => {
     (async () => {
       const { status } = await Location.getForegroundPermissionsAsync();
