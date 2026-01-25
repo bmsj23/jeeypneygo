@@ -27,7 +27,6 @@ function TabBarIcon({
       >
         <MaterialCommunityIcons name={focused ? nameFocused : name} size={24} color={color} />
       </View>
-      {focused && <View style={[styles.activeIndicator, { backgroundColor: theme.colors.primary }]} />}
     </View>
   );
 }
@@ -137,11 +136,5 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  activeIndicator: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    marginTop: 4,
   },
 });
