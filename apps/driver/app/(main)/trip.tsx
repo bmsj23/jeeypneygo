@@ -19,7 +19,6 @@ export default function TripScreen() {
   const theme = useTheme();
   const user = useAuthStore((state) => state.user);
 
-  // trip store
   const {
     activeTrip,
     selectedRoute,
@@ -35,22 +34,18 @@ export default function TripScreen() {
     resumeTrip,
   } = useTripStore();
 
-  // hooks
   const { routes, isLoading: routesLoading } = useRoutes({ includeStops: true });
   const { vehicle, isLoading: vehicleLoading } = useDriverVehicle(user?.id);
   const { isOnline, status: networkStatus } = useNetworkStatus();
 
-  // local state
   const [screenState, setScreenState] = useState<ScreenState>('route-select');
   const [tripSummary, setTripSummary] = useState<TripSummary | null>(null);
   const [tripDuration, setTripDuration] = useState(0);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [showDebug, setShowDebug] = useState(true);
 
-  // location tracking - enabled on route selection screen OR during active trip
   const shouldTrackLocation = screenState === 'route-select' || (activeTrip !== null && activeTrip.status === 'active');
 
-  // use refs for stable callback to prevent infinite update loops
   const activeTripRef = useRef(activeTrip);
   const updateLocationRef = useRef(updateLocation);
 
@@ -59,7 +54,6 @@ export default function TripScreen() {
     updateLocationRef.current = updateLocation;
   });
 
-  // stable callback that uses refs instead of direct dependencies
   const handleLocationUpdate = useCallback((location: { latitude: number; longitude: number; heading: number; speed: number }) => {
     if (activeTripRef.current) {
       updateLocationRef.current(location.latitude, location.longitude, location.heading, location.speed);
@@ -72,21 +66,18 @@ export default function TripScreen() {
     onLocationUpdate: handleLocationUpdate,
   });
 
-  // request location permission on mount
   useEffect(() => {
     if (hasPermission === null) {
       requestPermission();
     }
   }, [hasPermission, requestPermission]);
 
-  // set vehicle in store when loaded
   useEffect(() => {
     if (vehicle) {
       setVehicle(vehicle);
     }
   }, [vehicle, setVehicle]);
 
-  // determine screen state based on active trip
   useEffect(() => {
     if (activeTrip) {
       setScreenState('active-trip');
@@ -97,7 +88,6 @@ export default function TripScreen() {
     }
   }, [activeTrip, tripSummary]);
 
-  // trip duration timer
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
 
@@ -130,7 +120,6 @@ export default function TripScreen() {
   };
 
   const handleSelectRoute = async (route: Route) => {
-    // check for location permission first
     if (!hasPermission) {
       const granted = await requestPermission();
       if (!granted) {
@@ -153,7 +142,6 @@ export default function TripScreen() {
       return;
     }
 
-    // if location not available yet, try to get it
     let locationToUse: { latitude: number; longitude: number; heading: number; speed: number } | null = currentLocation;
     if (!locationToUse) {
       setIsGettingLocation(true);
@@ -240,10 +228,8 @@ export default function TripScreen() {
     }
   };
 
-  // route selection screen
   const renderRouteSelection = () => (
     <>
-      {/* connection status banner */}
       {!isOnline && (
         <View style={[styles.connectionBanner, { backgroundColor: theme.colors.errorContainer }]}>
           <Text variant="bodySmall" style={{ color: theme.colors.onErrorContainer }}>
@@ -260,9 +246,7 @@ export default function TripScreen() {
           Select your route to begin
         </Text>
 
-        {/* status indicators */}
         <View style={styles.statusRow}>
-          {/* gps status */}
           {currentLocation ? (
             <View style={styles.locationStatus}>
               <View style={[styles.statusDot, { backgroundColor: '#4CAF50' }]} />
@@ -279,7 +263,6 @@ export default function TripScreen() {
             </View>
           ) : null}
 
-          {/* connection status */}
           <View style={styles.locationStatus}>
             <View style={[styles.statusDot, { backgroundColor: isOnline ? '#4CAF50' : '#F44336' }]} />
             <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
@@ -289,7 +272,6 @@ export default function TripScreen() {
         </View>
       </View>
 
-      {/* debug panel */}
       {showDebug && (
         <Card style={styles.debugCard}>
           <Card.Content>
@@ -421,7 +403,6 @@ export default function TripScreen() {
     </>
   );
 
-  // active trip dashboard
   const renderActiveTrip = () => (
     <>
       <View style={styles.header}>
@@ -538,7 +519,6 @@ export default function TripScreen() {
     </>
   );
 
-  // trip summary screen
   const renderTripSummary = () => (
     <>
       <View style={styles.summaryHeader}>
