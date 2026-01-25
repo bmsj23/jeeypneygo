@@ -1,22 +1,33 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
-import { Text, useTheme, SegmentedButtons } from 'react-native-paper';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button, Input, ScreenContainer, Divider } from '@jeepneygo/ui';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@jeepneygo/core';
+import {
+  AuthHero,
+  LoginTabSelector,
+  LoginForm,
+  AuthFooter,
+  type LoginMethod,
+} from '../../components/auth';
+
+const COLORS = {
+  background: '#FFFFFF',
+};
 
 export default function DriverLoginScreen() {
-  const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const signInWithPhone = useAuthStore((state) => state.signInWithPhone);
   const signInWithEmail = useAuthStore((state) => state.signInWithEmail);
 
-  const [loginMethod, setLoginMethod] = useState<'phone' | 'email'>('email');
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>('email');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handlePhoneLogin = async () => {
     if (!phone.trim()) {
@@ -50,7 +61,7 @@ export default function DriverLoginScreen() {
           params: { phone: formattedPhone },
         });
       }
-    } catch (err) {
+    } catch {
       setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
@@ -78,7 +89,7 @@ export default function DriverLoginScreen() {
       } else {
         router.replace('/(main)' as any);
       }
-    } catch (err) {
+    } catch {
       setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
@@ -93,132 +104,70 @@ export default function DriverLoginScreen() {
     }
   };
 
+  const handleTabChange = (tab: LoginMethod) => {
+    setLoginMethod(tab);
+    setError(null);
+  };
+
   return (
-    <ScreenContainer avoidKeyboard scrollable>
-      <View style={styles.header}>
-        <View style={[styles.logoContainer, { backgroundColor: theme.colors.primary }]}>
-          <Text style={styles.logoText}>JG</Text>
-        </View>
-        <Text variant="headlineMedium" style={styles.title}>
-          JeepneyGo Driver
-        </Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
-          Sign in to start your trips
-        </Text>
-      </View>
-
-      <View style={styles.form}>
-        <SegmentedButtons
-          value={loginMethod}
-          onValueChange={(value) => {
-            setLoginMethod(value as 'phone' | 'email');
-            setError(null);
-          }}
-          buttons={[
-            { value: 'email', label: 'Email' },
-            { value: 'phone', label: 'Phone' },
+    <View style={[styles.container, { backgroundColor: COLORS.background }]}>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
           ]}
-          style={styles.segmentedButtons}
-        />
-
-        {loginMethod === 'phone' ? (
-          <Input
-            label="Phone Number"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            placeholder="09XX XXX XXXX"
-            left={<Input.Icon icon="phone" />}
-            errorMessage={error || undefined}
-            error={!!error}
-            disabled={isLoading}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <AuthHero
+            title="JeepneyGo"
+            subtitle="Driver"
+            tagline="Start earning with every trip"
           />
-        ) : (
-          <>
-            <Input
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              placeholder="driver@example.com"
-              left={<Input.Icon icon="email" />}
-              errorMessage={undefined}
-              error={!!error}
-              disabled={isLoading}
-            />
-            <Input
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              placeholder="Enter your password"
-              left={<Input.Icon icon="lock" />}
-              errorMessage={error || undefined}
-              error={!!error}
-              disabled={isLoading}
-            />
-          </>
-        )}
 
-        <Button
-          mode="contained"
-          size="large"
-          fullWidth
-          onPress={handleLogin}
-          loading={isLoading}
-          disabled={isLoading}
-        >
-          {loginMethod === 'phone' ? 'Send OTP' : 'Sign In'}
-        </Button>
+          <LoginTabSelector activeTab={loginMethod} onTabChange={handleTabChange} />
 
-        <Divider text="or" />
+          <LoginForm
+            loginMethod={loginMethod}
+            phone={phone}
+            email={email}
+            password={password}
+            showPassword={showPassword}
+            error={error}
+            isLoading={isLoading}
+            onPhoneChange={setPhone}
+            onEmailChange={setEmail}
+            onPasswordChange={setPassword}
+            onTogglePassword={() => setShowPassword(!showPassword)}
+            onSubmit={handleLogin}
+            onClearError={() => setError(null)}
+          />
 
-        <Button
-          mode="outlined"
-          size="medium"
-          fullWidth
-          onPress={() => router.push('/(auth)/register')}
-        >
-          Create New Account
-        </Button>
-      </View>
-    </ScreenContainer>
+          <AuthFooter
+            questionText="Don't have an account?"
+            actionText="Sign Up"
+            onActionPress={() => router.push('/(auth)/register')}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    alignItems: 'center',
-    marginTop: 40,
-    marginBottom: 48,
-  },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1A237E',
-  },
-  title: {
-    fontWeight: 'bold',
-    color: '#1A237E',
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: '#757575',
-    textAlign: 'center',
-  },
-  form: {
+  container: {
     flex: 1,
   },
-  segmentedButtons: {
-    marginBottom: 16,
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
   },
 });
