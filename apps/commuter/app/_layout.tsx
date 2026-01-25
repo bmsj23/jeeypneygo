@@ -2,11 +2,13 @@ import 'react-native-gesture-handler';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ThemeProvider, commuterTheme } from '@jeepneygo/ui';
-import { QueryProvider, useAuthStore } from '@jeepneygo/core';
+import { ThemeProvider, commuterTheme, ToastContainer } from '@jeepneygo/ui';
+import { QueryProvider, useAuthStore, useToastStore } from '@jeepneygo/core';
 
 function RootLayoutContent() {
   const initialize = useAuthStore((state) => state.initialize);
+  const toasts = useToastStore((state) => state.toasts);
+  const dismissToast = useToastStore((state) => state.dismissToast);
 
   useEffect(() => {
     initialize();
@@ -32,6 +34,7 @@ function RootLayoutContent() {
         <Stack.Screen name="support" options={{ headerShown: true }} />
         <Stack.Screen name="about" options={{ headerShown: true }} />
       </Stack>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </>
   );
 }
