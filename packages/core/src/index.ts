@@ -5,6 +5,8 @@ export * from './types/spacing';
 export * from './stores/auth-store';
 export * from './stores/trip-store';
 export * from './stores/settings-store';
+export * from './stores/favorites-store';
+export * from './stores/toast-store';
 
 export * from './services/supabase';
 
