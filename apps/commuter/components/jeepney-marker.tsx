@@ -13,14 +13,12 @@ interface JeepneyMarkerProps {
 
 const ANIMATION_DURATION = 500;
 const MARKER_SIZE = 48;
-// disable tracksViewChanges after animation completes for performance
 const TRACKS_VIEW_CHANGES_TIMEOUT = 600;
 
 function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarkerProps) {
   const routeColor = trip.route?.color || '#FFB800';
   const heading = trip.heading || 0;
 
-  // dynamic tracksViewChanges - only true during updates for better performance
   const [tracksViewChanges, setTracksViewChanges] = useState(true);
   const tracksTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -41,7 +39,6 @@ function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarke
     heading: heading,
   });
 
-  // schedule disabling tracksViewChanges after updates settle
   const scheduleDisableTracking = useCallback(() => {
     if (tracksTimeoutRef.current) {
       clearTimeout(tracksTimeoutRef.current);
@@ -82,7 +79,7 @@ function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarke
 
     if (headingChanged) {
       scheduleDisableTracking();
-      // handle wrap-around for smooth rotation
+
       let targetHeading = newHeading;
       let diff = targetHeading - prevCoords.heading;
       if (diff > 180) targetHeading = newHeading - 360;
@@ -93,7 +90,6 @@ function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarke
         duration: ANIMATION_DURATION,
         useNativeDriver: true,
       }).start(() => {
-        // normalize after animation completes
         animatedHeading.setValue(newHeading);
       });
     }
@@ -114,7 +110,6 @@ function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarke
     outputRange: ['-360deg', '0deg', '360deg', '720deg'],
   });
 
-  // only enable tracksViewChanges on ios when actively updating
   const shouldTrackChanges = Platform.OS === 'ios' && tracksViewChanges;
 
   return (
