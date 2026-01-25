@@ -12,7 +12,6 @@ import type {
 import { calculateDistance } from './eta-calculator';
 import { DEFAULT_SPACING_THRESHOLDS } from '../types/spacing';
 
-// decode google polyline to array of coordinates
 export function decodePolyline(encoded: string): Coordinates[] {
   const coordinates: Coordinates[] = [];
   let index = 0;
@@ -54,7 +53,6 @@ export function decodePolyline(encoded: string): Coordinates[] {
   return coordinates;
 }
 
-// convert waypoints to coordinates array
 export function waypointsToCoordinates(waypoints: RouteWaypoint[]): Coordinates[] {
   return waypoints.map((wp) => ({
     latitude: wp.lat,
@@ -62,7 +60,6 @@ export function waypointsToCoordinates(waypoints: RouteWaypoint[]): Coordinates[
   }));
 }
 
-// calculate total route length from coordinates
 export function calculateRouteLength(coordinates: Coordinates[]): number {
   let totalDistance = 0;
   for (let i = 0; i < coordinates.length - 1; i++) {
@@ -71,7 +68,6 @@ export function calculateRouteLength(coordinates: Coordinates[]): number {
   return totalDistance;
 }
 
-// find nearest point on route and return distance from route start
 export function projectOntoRoute(
   position: Coordinates,
   routeCoordinates: Coordinates[]
@@ -89,7 +85,6 @@ export function projectOntoRoute(
     const segmentEnd = routeCoordinates[i + 1];
     const segmentLength = calculateDistance(segmentStart, segmentEnd);
 
-    // find closest point on this segment
     const projected = projectOntoSegment(position, segmentStart, segmentEnd);
     const distance = calculateDistance(position, projected.point);
 
@@ -111,7 +106,6 @@ export function projectOntoRoute(
   };
 }
 
-// project a point onto a line segment
 function projectOntoSegment(
   point: Coordinates,
   segmentStart: Coordinates,
@@ -139,7 +133,6 @@ function projectOntoSegment(
   };
 }
 
-// determine spacing status based on distances
 function determineSpacingStatus(
   distanceAhead: number | null,
   distanceBehind: number | null,
@@ -163,17 +156,14 @@ function determineSpacingStatus(
   return 'optimal';
 }
 
-// sort trips by their position along the route
 function sortTripsByRoutePosition(
   trips: ActiveTripWithDetails[],
   routeCoordinates: Coordinates[] | null
 ): ActiveTripWithDetails[] {
   if (!routeCoordinates || routeCoordinates.length < 2) {
-    // fallback: sort by latitude (north-south assumption)
     return [...trips].sort((a, b) => b.current_latitude - a.current_latitude);
   }
 
-  // project each trip onto route and sort by distance from start
   const tripsWithProgress = trips.map((trip) => {
     const projection = projectOntoRoute(
       { latitude: trip.current_latitude, longitude: trip.current_longitude },
@@ -187,7 +177,6 @@ function sortTripsByRoutePosition(
     .map((item) => item.trip);
 }
 
-// generate alerts from spacing data
 function generateAlerts(
   spacingMap: Map<string, DriverSpacing>,
   thresholds: SpacingThresholds = DEFAULT_SPACING_THRESHOLDS
@@ -196,7 +185,6 @@ function generateAlerts(
   const processedPairs = new Set<string>();
 
   spacingMap.forEach((spacing) => {
-    // critical alert
     if (spacing.spacingStatus === 'critical' && spacing.distanceAhead !== null) {
       const pairKey = [spacing.tripId, spacing.driverAhead?.id].sort().join('-');
       if (!processedPairs.has(pairKey)) {
@@ -215,7 +203,6 @@ function generateAlerts(
       }
     }
 
-    // too close warning
     if (spacing.spacingStatus === 'too_close' && spacing.distanceAhead !== null) {
       const pairKey = [spacing.tripId, spacing.driverAhead?.id].sort().join('-');
       if (!processedPairs.has(pairKey)) {
@@ -234,7 +221,6 @@ function generateAlerts(
       }
     }
 
-    // gap alert for isolated drivers
     if (spacing.spacingStatus === 'too_far') {
       alerts.push({
         id: `gap-${spacing.tripId}-${Date.now()}`,
@@ -251,7 +237,6 @@ function generateAlerts(
   return alerts;
 }
 
-// calculate route stats from spacing data
 function calculateRouteStats(
   routeId: string,
   spacingMap: Map<string, DriverSpacing>
@@ -277,14 +262,12 @@ function calculateRouteStats(
   };
 }
 
-// format distance for display
 export function formatDistance(km: number | null): string {
   if (km === null) return 'N/A';
   if (km < 1) return `${Math.round(km * 1000)}m`;
   return `${km.toFixed(1)}km`;
 }
 
-// main calculation function
 export function calculateDriverSpacing(
   trips: ActiveTripWithDetails[],
   routeId: string,
@@ -293,7 +276,6 @@ export function calculateDriverSpacing(
 ): SpacingCalculationResult {
   const spacingMap = new Map<string, DriverSpacing>();
 
-  // filter trips on same route with active status
   const routeTrips = trips.filter((t) => t.route_id === routeId && t.status === 'active');
 
   if (routeTrips.length === 0) {
@@ -304,10 +286,8 @@ export function calculateDriverSpacing(
     };
   }
 
-  // calculate total route length for progress percentage
   const routeLength = routeCoordinates ? calculateRouteLength(routeCoordinates) : null;
 
-  // sort by position along route
   const sorted = sortTripsByRoutePosition(routeTrips, routeCoordinates);
 
   for (let i = 0; i < sorted.length; i++) {
@@ -334,7 +314,6 @@ export function calculateDriverSpacing(
         })
       : null;
 
-    // calculate time to driver ahead based on relative speed
     const timeToAhead =
       distanceAhead !== null && current.speed > 0
         ? (distanceAhead / current.speed) * 60
@@ -345,7 +324,6 @@ export function calculateDriverSpacing(
         ? (distanceBehind / behind.speed) * 60
         : null;
 
-    // calculate route progress percentage
     let routeProgressPercent: number | null = null;
     if (routeCoordinates && routeLength && routeLength > 0) {
       const projection = projectOntoRoute(currentPos, routeCoordinates);
@@ -374,7 +352,6 @@ export function calculateDriverSpacing(
   return { spacingMap, alerts, routeStats };
 }
 
-// get spacing for a specific driver
 export function getDriverSpacing(
   tripId: string,
   result: SpacingCalculationResult
@@ -382,12 +359,10 @@ export function getDriverSpacing(
   return result.spacingMap.get(tripId) ?? null;
 }
 
-// get critical alerts only
 export function getCriticalAlerts(result: SpacingCalculationResult): SpacingAlert[] {
   return result.alerts.filter((alert) => alert.severity === 'critical');
 }
 
-// get color for spacing status
 export function getSpacingStatusColor(status: SpacingStatus): string {
   const colors: Record<SpacingStatus, string> = {
     optimal: '#4CAF50',
@@ -399,7 +374,6 @@ export function getSpacingStatusColor(status: SpacingStatus): string {
   return colors[status];
 }
 
-// get alert severity color
 export function getAlertSeverityColor(severity: AlertSeverity): string {
   const colors: Record<AlertSeverity, string> = {
     info: '#2196F3',
