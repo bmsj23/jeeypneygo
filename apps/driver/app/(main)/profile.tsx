@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuthStore, useTripHistory, useDriverVehicle } from '@jeepneygo/core';
+import { useAuthStore, useTripHistory, useDriverVehicle, useTripStore } from '@jeepneygo/core';
 import {
   ProfileHeader,
   ProfileStats,
@@ -21,6 +21,11 @@ export default function ProfileScreen() {
   const signOut = useAuthStore((state) => state.signOut);
   const [refreshing, setRefreshing] = useState(false);
 
+  // get current trip data from store
+  const activeTrip = useTripStore((state) => state.activeTrip);
+  const currentTripPassengers = useTripStore((state) => state.regularPassengers + state.discountedPassengers);
+  const tripStartTime = useTripStore((state) => state.tripStartTime);
+
   const { trips, isLoading: tripsLoading, refetch: refetchTrips } = useTripHistory({
     driverId: user?.id,
     limit: 1000,
@@ -29,15 +34,22 @@ export default function ProfileScreen() {
 
   const { vehicle, isLoading: vehicleLoading, refetch: refetchVehicle } = useDriverVehicle(user?.id);
 
-  const totalTrips = trips.length;
-  const totalPassengers = trips.reduce((sum, trip) => sum + (trip.total_passengers || 0), 0);
-  const totalHours = Math.round(
-    trips.reduce((sum, trip) => {
-      const start = new Date(trip.started_at).getTime();
-      const end = new Date(trip.ended_at).getTime();
-      return sum + (end - start) / 1000 / 3600;
-    }, 0) * 10
-  ) / 10;
+  // calculate stats from completed trips
+  const completedTrips = trips.length;
+  const completedPassengers = trips.reduce((sum, trip) => sum + (trip.total_passengers || 0), 0);
+  const completedHours = trips.reduce((sum, trip) => {
+    const start = new Date(trip.started_at).getTime();
+    const end = new Date(trip.ended_at).getTime();
+    return sum + (end - start) / 1000 / 3600;
+  }, 0);
+
+  // add current trip data if active
+  const totalTrips = completedTrips + (activeTrip ? 1 : 0);
+  const totalPassengers = completedPassengers + currentTripPassengers;
+  const currentTripHours = activeTrip && tripStartTime
+    ? (Date.now() - tripStartTime) / 1000 / 3600
+    : 0;
+  const totalHours = Math.round((completedHours + currentTripHours) * 10) / 10;
 
   const driverRating = 4.8;
 
