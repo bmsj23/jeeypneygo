@@ -128,7 +128,7 @@ export default function RoutesScreen() {
       <View style={[styles.heroHeader, { paddingTop: insets.top + 16, backgroundColor: theme.colors.primary }]}>
         <Text style={styles.heroTitle}>Jeepney Routes</Text>
         <Text style={styles.heroSubtitle}>
-          {routes.length} routes in Lipa City
+          {routes.length} routes in Batangas Province
         </Text>
 
         {/* active summary card */}

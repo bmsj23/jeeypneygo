@@ -28,11 +28,11 @@ import {
 
 const { width, height } = Dimensions.get('window');
 
-const LIPA_REGION: Region = {
-  latitude: 13.9411,
-  longitude: 121.1625,
-  latitudeDelta: 0.05,
-  longitudeDelta: 0.05,
+const BATANGAS_REGION: Region = {
+  latitude: 13.8500,
+  longitude: 121.0800,
+  latitudeDelta: 0.25,
+  longitudeDelta: 0.25,
 };
 
 type ViewMode = 'map' | 'search';
@@ -223,7 +223,7 @@ export default function MapScreen() {
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_DEFAULT}
-        initialRegion={LIPA_REGION}
+        initialRegion={BATANGAS_REGION}
         showsUserLocation
         showsMyLocationButton={false}
         showsCompass={false}

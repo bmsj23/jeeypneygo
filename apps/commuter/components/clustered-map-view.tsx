@@ -29,12 +29,15 @@ export interface JeepneyClusteredMapViewProps extends Omit<MapViewProps, 'ref'> 
   onClusterPress?: (cluster: typeof Marker, markers?: (typeof Marker)[]) => void;
 }
 
-export const LIPA_REGION: Region = {
-  latitude: 13.9411,
-  longitude: 121.1625,
-  latitudeDelta: 0.05,
-  longitudeDelta: 0.05,
+export const BATANGAS_REGION: Region = {
+  latitude: 13.8500,
+  longitude: 121.0800,
+  latitudeDelta: 0.25,
+  longitudeDelta: 0.25,
 };
+
+// alias for backward compatibility
+export const LIPA_REGION = BATANGAS_REGION;
 
 export const JeepneyClusteredMapView = forwardRef<any, JeepneyClusteredMapViewProps>(
   (
