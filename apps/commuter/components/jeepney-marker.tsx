@@ -1,7 +1,8 @@
-import React, { memo, useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import React, { memo, useEffect, useRef, useState, useCallback } from 'react';
+import { View, StyleSheet, Animated, Platform } from 'react-native';
 import { Text } from 'react-native-paper';
-import { Marker, AnimatedRegion, MarkerAnimated } from 'react-native-maps';
+import { AnimatedRegion, MarkerAnimated } from 'react-native-maps';
+import { JeepneySvg } from '@jeepneygo/ui';
 import type { ActiveTripWithDetails } from '@jeepneygo/core';
 
 interface JeepneyMarkerProps {
@@ -11,10 +12,17 @@ interface JeepneyMarkerProps {
 }
 
 const ANIMATION_DURATION = 500;
+const MARKER_SIZE = 48;
+// disable tracksViewChanges after animation completes for performance
+const TRACKS_VIEW_CHANGES_TIMEOUT = 600;
 
 function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarkerProps) {
   const routeColor = trip.route?.color || '#FFB800';
   const heading = trip.heading || 0;
+
+  // dynamic tracksViewChanges - only true during updates for better performance
+  const [tracksViewChanges, setTracksViewChanges] = useState(true);
+  const tracksTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const animatedCoordinate = useRef(
     new AnimatedRegion({
@@ -33,6 +41,25 @@ function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarke
     heading: heading,
   });
 
+  // schedule disabling tracksViewChanges after updates settle
+  const scheduleDisableTracking = useCallback(() => {
+    if (tracksTimeoutRef.current) {
+      clearTimeout(tracksTimeoutRef.current);
+    }
+    setTracksViewChanges(true);
+    tracksTimeoutRef.current = setTimeout(() => {
+      setTracksViewChanges(false);
+    }, TRACKS_VIEW_CHANGES_TIMEOUT);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (tracksTimeoutRef.current) {
+        clearTimeout(tracksTimeoutRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     const prevCoords = prevCoordsRef.current;
     const newLat = trip.current_latitude || 0;
@@ -44,6 +71,7 @@ function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarke
     const headingChanged = prevCoords.heading !== newHeading;
 
     if (coordsChanged) {
+      scheduleDisableTracking();
       animatedCoordinate.timing({
         latitude: newLat,
         longitude: newLng,
@@ -53,11 +81,21 @@ function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarke
     }
 
     if (headingChanged) {
+      scheduleDisableTracking();
+      // handle wrap-around for smooth rotation
+      let targetHeading = newHeading;
+      let diff = targetHeading - prevCoords.heading;
+      if (diff > 180) targetHeading = newHeading - 360;
+      if (diff < -180) targetHeading = newHeading + 360;
+
       Animated.timing(animatedHeading, {
-        toValue: newHeading,
+        toValue: targetHeading,
         duration: ANIMATION_DURATION,
         useNativeDriver: true,
-      }).start();
+      }).start(() => {
+        // normalize after animation completes
+        animatedHeading.setValue(newHeading);
+      });
     }
 
     prevCoordsRef.current = {
@@ -65,37 +103,36 @@ function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarke
       longitude: newLng,
       heading: newHeading,
     };
-  }, [trip.current_latitude, trip.current_longitude, trip.heading, animatedCoordinate, animatedHeading]);
+  }, [trip.current_latitude, trip.current_longitude, trip.heading, animatedCoordinate, animatedHeading, scheduleDisableTracking]);
 
   if (!trip.current_latitude || !trip.current_longitude) {
     return null;
   }
 
   const rotation = animatedHeading.interpolate({
-    inputRange: [0, 360],
-    outputRange: ['0deg', '360deg'],
+    inputRange: [-360, 0, 360, 720],
+    outputRange: ['-360deg', '0deg', '360deg', '720deg'],
   });
+
+  // only enable tracksViewChanges on ios when actively updating
+  const shouldTrackChanges = Platform.OS === 'ios' && tracksViewChanges;
 
   return (
     <MarkerAnimated
       coordinate={animatedCoordinate}
       onPress={() => onPress?.(trip)}
-      tracksViewChanges={true}
+      tracksViewChanges={shouldTrackChanges}
       anchor={{ x: 0.5, y: 0.5 }}
     >
       <View style={[styles.container, isStale && styles.stale]}>
         <Animated.View
           style={[
-            styles.directionArrow,
-            {
-              borderBottomColor: routeColor,
-              transform: [{ rotate: rotation }],
-            },
+            styles.markerWrapper,
+            { transform: [{ rotate: rotation }] },
           ]}
-        />
-        <View style={[styles.markerBody, { backgroundColor: routeColor }]}>
-          <Text style={styles.markerIcon}>🚐</Text>
-        </View>
+        >
+          <JeepneySvg size={MARKER_SIZE} color={routeColor} />
+        </Animated.View>
         <View style={[styles.passengerBadge, { backgroundColor: routeColor }]}>
           <Text style={styles.passengerText}>{trip.passenger_count || 0}</Text>
         </View>
@@ -107,50 +144,38 @@ function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarke
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
+    justifyContent: 'center',
     opacity: 1,
   },
   stale: {
     opacity: 0.4,
   },
-  directionArrow: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderBottomWidth: 10,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    marginBottom: -2,
+  markerWrapper: {
+    width: MARKER_SIZE,
+    height: MARKER_SIZE,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
   },
-  markerBody: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  passengerBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  markerIcon: {
-    fontSize: 18,
-  },
-  passengerBadge: {
-    position: 'absolute',
-    top: 6,
-    right: -8,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
     paddingHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
   },
   passengerText: {
     color: '#FFFFFF',
@@ -159,4 +184,30 @@ const styles = StyleSheet.create({
   },
 });
 
-export const JeepneyMarker = memo(JeepneyMarkerComponent);
+// custom comparison function for memo - only re-render on significant changes
+function arePropsEqual(prevProps: JeepneyMarkerProps, nextProps: JeepneyMarkerProps): boolean {
+  // always re-render if trip id changes
+  if (prevProps.trip.id !== nextProps.trip.id) return false;
+
+  // re-render if stale status changes
+  if (prevProps.isStale !== nextProps.isStale) return false;
+
+  // re-render if position changes (with small threshold for noise)
+  const latDiff = Math.abs((prevProps.trip.current_latitude || 0) - (nextProps.trip.current_latitude || 0));
+  const lngDiff = Math.abs((prevProps.trip.current_longitude || 0) - (nextProps.trip.current_longitude || 0));
+  if (latDiff > 0.00001 || lngDiff > 0.00001) return false;
+
+  // re-render if heading changes by more than 2 degrees
+  const headingDiff = Math.abs((prevProps.trip.heading || 0) - (nextProps.trip.heading || 0));
+  if (headingDiff > 2) return false;
+
+  // re-render if passenger count changes
+  if (prevProps.trip.passenger_count !== nextProps.trip.passenger_count) return false;
+
+  // re-render if route color changes
+  if (prevProps.trip.route?.color !== nextProps.trip.route?.color) return false;
+
+  return true;
+}
+
+export const JeepneyMarker = memo(JeepneyMarkerComponent, arePropsEqual);
