@@ -40,10 +40,8 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
   }, [updateStatus]);
 
   useEffect(() => {
-    // get initial state
     NetInfo.fetch().then(updateStatus);
 
-    // subscribe to changes
     const unsubscribe = NetInfo.addEventListener(updateStatus);
 
     return () => {
