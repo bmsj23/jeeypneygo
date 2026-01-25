@@ -9,7 +9,6 @@ export default function RootIndex() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const user = useAuthStore((state) => state.user);
 
-  // show loading while checking auth state
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -18,17 +17,14 @@ export default function RootIndex() {
     );
   }
 
-  // redirect based on auth state
   if (!isAuthenticated) {
     return <Redirect href="/(auth)/login" />;
   }
 
-  // check if driver is approved
   if (user && user.role === 'driver' && !user.is_approved) {
     return <Redirect href="/(auth)/pending-approval" />;
   }
 
-  // authenticated and approved - go to main app
   return <Redirect href={'/(main)' as any} />;
 }
 
