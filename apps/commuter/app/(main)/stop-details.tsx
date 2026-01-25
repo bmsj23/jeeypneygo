@@ -10,7 +10,7 @@ import {
   useStops,
   useFavorites,
   useAuthStore,
-  calculateETA,
+  calculateStableETA,
   isLocationStale,
   type ActiveTripWithDetails,
   type Route,
@@ -48,7 +48,8 @@ export default function StopDetailsScreen() {
     const withEta = routeTrips
       .filter((trip) => trip.current_latitude && trip.current_longitude)
       .map((trip) => {
-        const etaMinutes = calculateETA(
+        const etaMinutes = calculateStableETA(
+          trip.id,
           { latitude: trip.current_latitude!, longitude: trip.current_longitude! },
           { latitude: stop.latitude, longitude: stop.longitude }
         );
