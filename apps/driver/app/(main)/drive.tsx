@@ -63,8 +63,10 @@ export default function DriveScreen() {
     totalFare,
     regularPassengers,
     discountedPassengers,
-    logFare,
+    currentPassengersOnboard,
+    logCustomFare,
     undoLastFare,
+    decrementPassenger,
   } = useTripStore();
 
   const { routes, isLoading: routesLoading } = useRoutes();
@@ -81,7 +83,7 @@ export default function DriveScreen() {
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [pendingRoute, setPendingRoute] = useState<Route | null>(null);
   const [isGoOnlinePressed, setIsGoOnlinePressed] = useState(false);
-  const [todayEarnings] = useState(0);
+  const [isFareEntryMode, setIsFareEntryMode] = useState(false);
 
   const shouldTrackLocation = driveState !== 'summary';
   const activeTripRef = useRef(activeTrip);
@@ -131,6 +133,13 @@ export default function DriveScreen() {
       bottomSheetRef.current?.snapToIndex(0);
     }
   }, [activeTrip, tripSummary]);
+
+  useEffect(() => {
+    if (driveState === 'active') {
+      // snap to expanded position when entering fare mode
+      bottomSheetRef.current?.snapToIndex(0);
+    }
+  }, [isFareEntryMode, driveState]);
 
   const pausedDurationRef = useRef(0);
   const lastPauseTimeRef = useRef<number | null>(null);
@@ -187,9 +196,17 @@ export default function DriveScreen() {
   const snapPoints = useMemo(() => {
     const tabBarHeight = Platform.OS === 'ios' ? 88 : 64;
     if (driveState === 'active') {
+      if (isFareEntryMode) {
+        // expanded mode when adding passenger fare - need more space for full UI
+        return [
+          Math.round(height * 0.55) + tabBarHeight,
+          Math.round(height * 0.65) + tabBarHeight,
+        ];
+      }
+      // compact mode when showing summary with pause/end buttons
       return [
-        Math.round(height * 0.20) + tabBarHeight,
-        Math.round(height * 0.42) + tabBarHeight,
+        Math.round(height * 0.38) + tabBarHeight,
+        Math.round(height * 0.50) + tabBarHeight,
       ];
     }
     if (driveState === 'selecting-route') {
@@ -199,7 +216,7 @@ export default function DriveScreen() {
       ];
     }
     return [Math.round(height * 0.28) + tabBarHeight];
-  }, [driveState]);
+  }, [driveState, isFareEntryMode]);
 
   const mapPadding = useMemo(() => {
     const sheetHeight = snapPoints[0] ?? 200;
@@ -351,12 +368,15 @@ export default function DriveScreen() {
           totalFare={totalFare}
           regularPassengers={regularPassengers}
           discountedPassengers={discountedPassengers}
+          currentPassengersOnboard={currentPassengersOnboard}
           fareEntries={fareEntries}
           isEndingTrip={isEndingTrip}
-          onLogFare={logFare}
+          onAddFare={logCustomFare}
           onUndoLastFare={undoLastFare}
+          onDecrementPassenger={decrementPassenger}
           onTogglePause={handleTogglePause}
           onEndTrip={handleEndTrip}
+          onFareEntryModeChange={setIsFareEntryMode}
         />
       );
     }
@@ -420,7 +440,7 @@ export default function DriveScreen() {
         })}
       </MapView>
 
-      <EarningsBadge amount={todayEarnings} />
+      <EarningsBadge amount={totalFare} />
 
       <Pressable
         onPress={handleCenterOnUser}
