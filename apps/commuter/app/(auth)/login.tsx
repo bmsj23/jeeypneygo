@@ -1,29 +1,48 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
-import { Text, useTheme, SegmentedButtons } from 'react-native-paper';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button, Input, ScreenContainer, Divider } from '@jeepneygo/ui';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSharedValue, withTiming } from 'react-native-reanimated';
 import { useAuthStore } from '@jeepneygo/core';
+import {
+  AuthHero,
+  LoginTabSelector,
+  LoginForm,
+  AuthFooter,
+  TAB_WIDTH,
+  type LoginMethod,
+} from '../../components/auth';
 
-type AuthMethod = 'email' | 'phone';
+const COLORS = {
+  background: '#FFFFFF',
+};
 
 export default function CommuterLoginScreen() {
-  const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const signInWithEmail = useAuthStore((state) => state.signInWithEmail);
   const signInWithPhone = useAuthStore((state) => state.signInWithPhone);
 
-  const [authMethod, setAuthMethod] = useState<AuthMethod>('email');
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const tabIndicatorPosition = useSharedValue(0);
+
+  useEffect(() => {
+    tabIndicatorPosition.value = withTiming(loginMethod === 'email' ? 0 : TAB_WIDTH, {
+      duration: 200,
+    });
+  }, [loginMethod]);
 
   const handleLogin = async () => {
     setError(null);
 
-    if (authMethod === 'email') {
+    if (loginMethod === 'email') {
       if (!email.trim()) {
         setError('Please enter your email');
         return;
@@ -41,13 +60,12 @@ export default function CommuterLoginScreen() {
         } else {
           router.replace('/(main)');
         }
-      } catch (err) {
+      } catch {
         setError('Something went wrong. Please try again.');
       } finally {
         setIsLoading(false);
       }
     } else {
-      // phone auth
       const phoneRegex = /^(\+63|0)?9\d{9}$/;
       if (!phone.trim()) {
         setError('Please enter your phone number');
@@ -75,7 +93,7 @@ export default function CommuterLoginScreen() {
             params: { phone: formattedPhone },
           });
         }
-      } catch (err) {
+      } catch {
         setError('Something went wrong. Please try again.');
       } finally {
         setIsLoading(false);
@@ -87,142 +105,84 @@ export default function CommuterLoginScreen() {
     router.replace('/(main)');
   };
 
+  const canSubmit = loginMethod === 'phone'
+    ? phone.trim().length > 0
+    : email.trim().length > 0 && password.trim().length > 0;
+
   return (
-    <ScreenContainer avoidKeyboard scrollable>
-      <View style={styles.header}>
-        <View style={[styles.logoContainer, { backgroundColor: theme.colors.primary }]}>
-          <Text style={styles.logoText}>JG</Text>
-        </View>
-        <Text variant="headlineMedium" style={styles.title}>
-          JeepneyGo
-        </Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
-          Track jeepneys in real-time
-        </Text>
-      </View>
-
-      <View style={styles.form}>
-        <SegmentedButtons
-          value={authMethod}
-          onValueChange={(value) => {
-            setAuthMethod(value as AuthMethod);
-            setError(null);
-          }}
-          buttons={[
-            { value: 'email', label: 'Email' },
-            { value: 'phone', label: 'Phone' },
+    <View style={[styles.container, { backgroundColor: COLORS.background }]}>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
           ]}
-          style={styles.segmented}
-        />
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <AuthHero />
 
-        {authMethod === 'email' ? (
-          <>
-            <Input
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              placeholder="your@email.com"
-              left={<Input.Icon icon="email" />}
-              disabled={isLoading}
-            />
-            <Input
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              placeholder="Enter your password"
-              left={<Input.Icon icon="lock" />}
-              errorMessage={error || undefined}
-              error={!!error}
-              disabled={isLoading}
-            />
-          </>
-        ) : (
-          <Input
-            label="Phone Number"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            placeholder="09XX XXX XXXX"
-            left={<Input.Icon icon="phone" />}
-            errorMessage={error || undefined}
-            error={!!error}
-            disabled={isLoading}
+          <LoginTabSelector
+            loginMethod={loginMethod}
+            tabIndicatorPosition={tabIndicatorPosition}
+            onSelectEmail={() => {
+              setLoginMethod('email');
+              setError(null);
+            }}
+            onSelectPhone={() => {
+              setLoginMethod('phone');
+              setError(null);
+            }}
           />
-        )}
 
-        <Button
-          mode="contained"
-          size="large"
-          fullWidth
-          onPress={handleLogin}
-          loading={isLoading}
-          disabled={isLoading}
-        >
-          {authMethod === 'email' ? 'Sign In' : 'Send OTP'}
-        </Button>
+          <LoginForm
+            loginMethod={loginMethod}
+            email={email}
+            password={password}
+            phone={phone}
+            showPassword={showPassword}
+            error={error}
+            isLoading={isLoading}
+            canSubmit={canSubmit}
+            onEmailChange={(text) => {
+              setEmail(text);
+              setError(null);
+            }}
+            onPasswordChange={(text) => {
+              setPassword(text);
+              setError(null);
+            }}
+            onPhoneChange={(text) => {
+              setPhone(text);
+              setError(null);
+            }}
+            onTogglePassword={() => setShowPassword(!showPassword)}
+            onSubmit={handleLogin}
+          />
 
-        <Divider text="or" />
-
-        <Button
-          mode="outlined"
-          size="medium"
-          fullWidth
-          onPress={handleGuestMode}
-          icon="account-off"
-        >
-          Continue as Guest
-        </Button>
-
-        <Button
-          mode="text"
-          onPress={() => router.push('/(auth)/register')}
-          style={styles.registerLink}
-        >
-          Create New Account
-        </Button>
-      </View>
-    </ScreenContainer>
+          <AuthFooter
+            onGuestMode={handleGuestMode}
+            onSignUp={() => router.push('/(auth)/register')}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    alignItems: 'center',
-    marginTop: 40,
-    marginBottom: 40,
-  },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1A237E',
-  },
-  title: {
-    fontWeight: 'bold',
-    color: '#1A237E',
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: '#757575',
-    textAlign: 'center',
-  },
-  form: {
+  container: {
     flex: 1,
   },
-  segmented: {
-    marginBottom: 24,
+  keyboardView: {
+    flex: 1,
   },
-  registerLink: {
-    marginTop: 16,
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
   },
 });
