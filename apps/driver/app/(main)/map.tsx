@@ -2,7 +2,7 @@ import React, { useRef, useCallback, useEffect, useMemo, useState } from 'react'
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { Text, useTheme, FAB, Snackbar, ActivityIndicator } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapView, { PROVIDER_DEFAULT, Region, Marker } from 'react-native-maps';
+import MapView, { PROVIDER_DEFAULT, Region } from 'react-native-maps';
 import ClusteredMapView from 'react-native-map-clustering';
 import {
   useAuthStore,
@@ -16,6 +16,7 @@ import {
 } from '@jeepneygo/core';
 import { ScreenContainer } from '@jeepneygo/ui';
 import { SpacingHUD } from '../../components/spacing-hud';
+import { DriverSelfMarker } from '../../components/drive/driver-self-marker';
 import { JeepneyMarker } from '../../../commuter/components/jeepney-marker';
 import { RouteSpacingOverlay } from '../../../commuter/components/route-spacing-overlay';
 
@@ -144,23 +145,16 @@ export default function DriverMapScreen() {
 
       if (isSelf) {
         return (
-          <Marker
+          <DriverSelfMarker
             key={trip.id}
             coordinate={{
               latitude: trip.current_latitude,
               longitude: trip.current_longitude,
             }}
-            anchor={{ x: 0.5, y: 0.5 }}
-          >
-            <View style={styles.selfMarkerContainer}>
-              <View style={[styles.selfMarkerOuter, { borderColor: theme.colors.primary }]}>
-                <View style={[styles.selfMarkerInner, { backgroundColor: theme.colors.primary }]}>
-                  <Text style={styles.selfMarkerText}>YOU</Text>
-                </View>
-              </View>
-              <View style={[styles.selfMarkerPulse, { borderColor: theme.colors.primary }]} />
-            </View>
-          </Marker>
+            gpsHeading={trip.heading || 0}
+            gpsSpeed={trip.speed || 0}
+            routeColor={currentRoute?.color || theme.colors.primary}
+          />
         );
       }
 
@@ -173,7 +167,7 @@ export default function DriverMapScreen() {
         />
       );
     },
-    [isCurrentDriver, theme.colors.primary]
+    [isCurrentDriver, theme.colors.primary, currentRoute?.color]
   );
 
   if (!activeTrip && !selectedRoute) {
@@ -330,38 +324,5 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 16,
-  },
-  selfMarkerContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selfMarkerOuter: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  selfMarkerInner: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selfMarkerText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  selfMarkerPulse: {
-    position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    opacity: 0.3,
   },
 });
