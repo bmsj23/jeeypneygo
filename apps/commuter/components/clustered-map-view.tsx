@@ -10,7 +10,6 @@ interface ClusterMarkerProps {
 }
 
 function ClusterMarker({ count, color }: ClusterMarkerProps) {
-  // scale size based on count
   const size = Math.min(Math.max(40, 30 + count * 2), 60);
 
   return (
@@ -22,18 +21,14 @@ function ClusterMarker({ count, color }: ClusterMarkerProps) {
 
 export interface JeepneyClusteredMapViewProps extends Omit<MapViewProps, 'ref'> {
   children?: React.ReactNode;
-  // clustering configuration
   clusteringEnabled?: boolean;
   clusterRadius?: number;
   minClusterPoints?: number;
   maxClusterZoom?: number;
-  // custom cluster color (defaults to theme primary)
   clusterColor?: string;
-  // callback when cluster is pressed
   onClusterPress?: (cluster: typeof Marker, markers?: (typeof Marker)[]) => void;
 }
 
-// lipa city default region
 export const LIPA_REGION: Region = {
   latitude: 13.9411,
   longitude: 121.1625,
@@ -58,7 +53,6 @@ export const JeepneyClusteredMapView = forwardRef<any, JeepneyClusteredMapViewPr
     const theme = useTheme();
     const effectiveClusterColor = clusterColor || theme.colors.primary;
 
-    // render custom cluster marker
     const renderCluster = useCallback(
       (cluster: any) => {
         const { id, geometry, onPress, properties } = cluster;
@@ -81,19 +75,16 @@ export const JeepneyClusteredMapView = forwardRef<any, JeepneyClusteredMapViewPr
       [effectiveClusterColor]
     );
 
-    // handle cluster press - zoom in by default
     const handleClusterPress = useCallback(
       (cluster: typeof Marker, markers?: (typeof Marker)[]) => {
         if (onClusterPress) {
           onClusterPress(cluster, markers);
         }
-        // default behavior: zoom handled by library
       },
       [onClusterPress]
     );
 
     if (!clusteringEnabled) {
-      // return regular mapview without clustering
       const MapViewComponent = require('react-native-maps').default;
       return (
         <MapViewComponent ref={ref} provider={PROVIDER_DEFAULT} {...mapProps}>

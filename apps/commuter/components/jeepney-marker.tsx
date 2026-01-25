@@ -10,14 +10,12 @@ interface JeepneyMarkerProps {
   onPress?: (trip: ActiveTripWithDetails) => void;
 }
 
-// animation duration for smooth marker movement (ms)
 const ANIMATION_DURATION = 500;
 
 function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarkerProps) {
   const routeColor = trip.route?.color || '#FFB800';
   const heading = trip.heading || 0;
 
-  // animated region for smooth position transitions
   const animatedCoordinate = useRef(
     new AnimatedRegion({
       latitude: trip.current_latitude || 0,
@@ -27,30 +25,25 @@ function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarke
     })
   ).current;
 
-  // animate heading rotation
   const animatedHeading = useRef(new Animated.Value(heading)).current;
 
-  // previous coordinates for comparison
   const prevCoordsRef = useRef({
     latitude: trip.current_latitude,
     longitude: trip.current_longitude,
     heading: heading,
   });
 
-  // animate to new position when coordinates change
   useEffect(() => {
     const prevCoords = prevCoordsRef.current;
     const newLat = trip.current_latitude || 0;
     const newLng = trip.current_longitude || 0;
     const newHeading = trip.heading || 0;
 
-    // only animate if coordinates actually changed
     const coordsChanged =
       prevCoords.latitude !== newLat || prevCoords.longitude !== newLng;
     const headingChanged = prevCoords.heading !== newHeading;
 
     if (coordsChanged) {
-      // use animateTo for animated region which is the correct method
       animatedCoordinate.timing({
         latitude: newLat,
         longitude: newLng,
@@ -78,7 +71,6 @@ function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarke
     return null;
   }
 
-  // interpolate heading for rotation transform
   const rotation = animatedHeading.interpolate({
     inputRange: [0, 360],
     outputRange: ['0deg', '360deg'],
@@ -92,7 +84,6 @@ function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarke
       anchor={{ x: 0.5, y: 0.5 }}
     >
       <View style={[styles.container, isStale && styles.stale]}>
-        {/* direction indicator with animated rotation */}
         <Animated.View
           style={[
             styles.directionArrow,
@@ -102,11 +93,9 @@ function JeepneyMarkerComponent({ trip, isStale = false, onPress }: JeepneyMarke
             },
           ]}
         />
-        {/* jeepney icon */}
         <View style={[styles.markerBody, { backgroundColor: routeColor }]}>
           <Text style={styles.markerIcon}>🚐</Text>
         </View>
-        {/* passenger count badge */}
         <View style={[styles.passengerBadge, { backgroundColor: routeColor }]}>
           <Text style={styles.passengerText}>{trip.passenger_count || 0}</Text>
         </View>

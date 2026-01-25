@@ -15,15 +15,12 @@ export const JeepneyDetailsSheet = forwardRef<BottomSheet, JeepneyDetailsSheetPr
     const theme = useTheme();
     const snapPoints = useMemo(() => ['35%'], []);
 
-    // local state for real-time updates
     const [liveTrip, setLiveTrip] = useState<ActiveTripWithDetails | null>(trip);
 
-    // sync with prop when trip changes
     useEffect(() => {
       setLiveTrip(trip);
     }, [trip]);
 
-    // subscribe to real-time updates for this specific trip
     useEffect(() => {
       if (!trip?.id) return;
 
@@ -38,13 +35,11 @@ export const JeepneyDetailsSheet = forwardRef<BottomSheet, JeepneyDetailsSheetPr
             filter: `id=eq.${trip.id}`,
           },
           (payload) => {
-            // merge updated fields with existing trip data to preserve relations
             setLiveTrip((prev) => {
               if (!prev) return null;
               return {
                 ...prev,
                 ...payload.new,
-                // preserve joined relations
                 vehicle: prev.vehicle,
                 driver: prev.driver,
                 route: prev.route,
@@ -74,7 +69,6 @@ export const JeepneyDetailsSheet = forwardRef<BottomSheet, JeepneyDetailsSheetPr
     const maxCapacity = displayTrip.vehicle?.capacity || 20;
     const availableSeats = Math.max(0, maxCapacity - passengerCount);
 
-    // seat availability indicator
     const getSeatStatus = () => {
       const fillPercentage = passengerCount / maxCapacity;
       if (fillPercentage >= 1) {
@@ -102,7 +96,6 @@ export const JeepneyDetailsSheet = forwardRef<BottomSheet, JeepneyDetailsSheetPr
         handleIndicatorStyle={{ backgroundColor: theme.colors.onSurfaceVariant }}
       >
         <BottomSheetView style={styles.content}>
-          {/* header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <View style={[styles.routeIndicator, { backgroundColor: routeColor }]} />
@@ -120,7 +113,6 @@ export const JeepneyDetailsSheet = forwardRef<BottomSheet, JeepneyDetailsSheetPr
 
           <Divider style={styles.divider} />
 
-          {/* seat availability */}
           <View style={styles.section}>
             <View style={styles.seatRow}>
               <View style={styles.seatInfo}>
@@ -140,7 +132,6 @@ export const JeepneyDetailsSheet = forwardRef<BottomSheet, JeepneyDetailsSheetPr
               </Chip>
             </View>
 
-            {/* capacity bar */}
             <View style={styles.capacityBar}>
               <View
                 style={[
@@ -159,7 +150,6 @@ export const JeepneyDetailsSheet = forwardRef<BottomSheet, JeepneyDetailsSheetPr
 
           <Divider style={styles.divider} />
 
-          {/* status info */}
           <View style={styles.statusRow}>
             <View style={styles.statusItem}>
               <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
