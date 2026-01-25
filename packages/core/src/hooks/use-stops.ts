@@ -51,7 +51,6 @@ export function useStops(options: UseStopsOptions = {}): UseStopsReturn {
     fetchStops();
   }, [routeId, includeRoute]);
 
-  // filter stops based on search query
   const filteredStops = useMemo(() => {
     if (!searchQuery || searchQuery.trim() === '') {
       return stops;

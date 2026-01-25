@@ -15,7 +15,6 @@ interface UseUserLocationReturn {
   refreshLocation: () => Promise<void>;
 }
 
-// default to lipa city center if location not available
 const LIPA_CITY_CENTER: Coordinates = {
   latitude: 13.9411,
   longitude: 121.1625,
@@ -48,7 +47,6 @@ export function useUserLocation(options: UseUserLocationOptions = {}): UseUserLo
       setPermissionStatus(status);
 
       if (status !== Location.PermissionStatus.GRANTED) {
-        // use default location if permission not granted
         setLocation(LIPA_CITY_CENTER);
         setError('Location permission not granted');
         return;
@@ -65,7 +63,6 @@ export function useUserLocation(options: UseUserLocationOptions = {}): UseUserLo
     } catch (err) {
       console.error('Error getting location:', err);
       setError('Failed to get current location');
-      // fallback to lipa city center
       setLocation(LIPA_CITY_CENTER);
     } finally {
       setIsLoading(false);
@@ -79,7 +76,6 @@ export function useUserLocation(options: UseUserLocationOptions = {}): UseUserLo
         if (granted) {
           await refreshLocation();
         } else {
-          // use default location
           setLocation(LIPA_CITY_CENTER);
           setIsLoading(false);
         }

@@ -39,7 +39,6 @@ export function useRoutes(options: UseRoutesOptions = {}): UseRoutesReturn {
         throw new Error(queryError.message);
       }
 
-      // sort stops by order_index if included
       if (includeStops && data) {
         const routesWithSortedStops = data.map((route: RouteWithStops) => ({
           ...route,
