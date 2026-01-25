@@ -82,6 +82,12 @@ export default function MainLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="history"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
