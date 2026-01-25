@@ -185,7 +185,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: 12,
+    paddingBottom: 8,
   },
   footerText: {
     fontSize: 13,
