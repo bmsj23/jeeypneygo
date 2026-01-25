@@ -27,3 +27,5 @@ export { SearchBar, SearchBarHero } from './components/search-bar';
 export { QuickActionButton, QuickActionsRow } from './components/quick-action-button';
 export { SectionHeader } from './components/section-header';
 export { RouteFilterChip, RouteFilterBar } from './components/route-filter-chip';
+export { JeepneySvg, ROUTE_COLORS } from './components/jeepney-svg';
+export type { RouteColorKey } from './components/jeepney-svg';
