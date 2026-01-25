@@ -7,7 +7,6 @@ interface InputProps extends Omit<TextInputProps, 'theme'> {
   errorMessage?: string;
 }
 
-// re-export icon for convenience
 const InputIcon = TextInput.Icon;
 
 function InputComponent({
@@ -35,7 +34,6 @@ function InputComponent({
   );
 }
 
-// attach icon to component
 export const Input = Object.assign(InputComponent, { Icon: InputIcon });
 
 const styles = StyleSheet.create({

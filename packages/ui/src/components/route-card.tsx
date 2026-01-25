@@ -39,16 +39,13 @@ export function RouteCard({
         },
       ]}
     >
-      {/* route color indicator */}
       <View style={[styles.colorBar, { backgroundColor: isSelected ? '#FFFFFF' : color }]} />
 
       <View style={styles.content}>
-        {/* short name badge */}
         <View style={[styles.shortNameBadge, { backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : `${color}20` }]}>
           <Text style={[styles.shortName, { color: isSelected ? '#FFFFFF' : color }]}>{shortName}</Text>
         </View>
 
-        {/* route name */}
         <Text
           style={[styles.name, { color: isSelected ? '#FFFFFF' : theme.colors.onSurface }]}
           numberOfLines={2}
@@ -56,7 +53,6 @@ export function RouteCard({
           {name}
         </Text>
 
-        {/* details row */}
         <View style={styles.detailsRow}>
           <View style={styles.detail}>
             <MaterialCommunityIcons
@@ -82,7 +78,6 @@ export function RouteCard({
         </View>
       </View>
 
-      {/* selection indicator */}
       {isSelected && (
         <View style={styles.selectedIndicator}>
           <MaterialCommunityIcons name="check-circle" size={24} color="#FFFFFF" />

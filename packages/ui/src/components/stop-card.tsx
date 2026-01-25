@@ -45,7 +45,6 @@ export function StopCard({
         },
       ]}
     >
-      {/* stop icon with route color */}
       <View
         style={[
           styles.iconContainer,
@@ -59,7 +58,6 @@ export function StopCard({
         />
       </View>
 
-      {/* main info */}
       <View style={styles.mainSection}>
         <Text style={[styles.stopName, { color: theme.colors.onSurface }]} numberOfLines={1}>
           {name}
@@ -90,7 +88,6 @@ export function StopCard({
         </View>
       </View>
 
-      {/* eta display */}
       {etaMinutes !== undefined && (
         <View style={styles.etaSection}>
           <Text style={[styles.etaValue, { color: getETAColor() }]}>{etaMinutes}</Text>
@@ -98,7 +95,6 @@ export function StopCard({
         </View>
       )}
 
-      {/* favorite button */}
       {onFavoriteToggle && (
         <Pressable
           onPress={onFavoriteToggle}
@@ -113,7 +109,6 @@ export function StopCard({
         </Pressable>
       )}
 
-      {/* chevron */}
       {!onFavoriteToggle && (
         <MaterialCommunityIcons
           name="chevron-right"

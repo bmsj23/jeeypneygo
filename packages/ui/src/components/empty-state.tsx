@@ -24,7 +24,6 @@ interface EmptyStateProps {
   style?: ViewStyle;
 }
 
-// preset configurations for common empty states
 const presets: Record<EmptyStateType, { icon: string; title: string; description: string }> = {
   'no-trips': {
     icon: 'bus-clock',

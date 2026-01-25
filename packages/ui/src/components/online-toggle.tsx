@@ -25,7 +25,6 @@ export function OnlineToggle({
 }: OnlineToggleProps) {
   const theme = useTheme();
 
-  // pulse animation for online state
   const pulseScale = useSharedValue(1);
 
   React.useEffect(() => {

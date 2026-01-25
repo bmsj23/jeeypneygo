@@ -10,7 +10,6 @@ interface SkeletonProps {
   style?: ViewStyle;
 }
 
-// single skeleton element with shimmer animation
 export function Skeleton({ width = 100, height = 16, borderRadius = 4, style }: SkeletonProps) {
   const theme = useTheme();
   const shimmerAnim = useRef(new Animated.Value(0)).current;
@@ -63,7 +62,6 @@ interface SkeletonCardProps {
   showImage?: boolean;
 }
 
-// skeleton card component for list items
 export function SkeletonCard({ style, lines = 2, showAvatar = false, showImage = false }: SkeletonCardProps) {
   const theme = useTheme();
 
@@ -98,7 +96,6 @@ interface SkeletonListProps {
   style?: ViewStyle;
 }
 
-// skeleton list for loading states
 export function SkeletonList({ count = 3, cardProps, style }: SkeletonListProps) {
   return (
     <View style={style}>

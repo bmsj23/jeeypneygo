@@ -60,7 +60,6 @@ export function JeepneyETACard({
         },
       ]}
     >
-      {/* eta section */}
       <View style={styles.etaSection}>
         <Text style={[styles.etaValue, { color: getETAColor() }]}>
           {etaMinutes}
@@ -73,7 +72,6 @@ export function JeepneyETACard({
         )}
       </View>
 
-      {/* main info */}
       <View style={styles.mainSection}>
         <View style={styles.headerRow}>
           <View style={[styles.routeBadge, { backgroundColor: routeColor + '20' }]}>
@@ -106,7 +104,6 @@ export function JeepneyETACard({
           </View>
         )}
 
-        {/* seats indicator */}
         <View style={styles.seatsSection}>
           <View style={[styles.seatsBar, { backgroundColor: theme.colors.surfaceVariant }]}>
             <View
@@ -122,7 +119,6 @@ export function JeepneyETACard({
         </View>
       </View>
 
-      {/* track button */}
       {onTrack && (
         <Pressable
           onPress={onTrack}

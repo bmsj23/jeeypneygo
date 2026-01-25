@@ -26,7 +26,6 @@ export function TripTimer({ seconds, status, routeName, routeColor }: TripTimerP
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
-      {/* status indicator */}
       <View style={styles.statusRow}>
         <View style={[styles.statusDot, { backgroundColor: status === 'active' ? '#4CAF50' : '#FF9800' }]} />
         <Text style={[styles.statusText, { color: status === 'active' ? '#4CAF50' : '#FF9800' }]}>
@@ -34,10 +33,8 @@ export function TripTimer({ seconds, status, routeName, routeColor }: TripTimerP
         </Text>
       </View>
 
-      {/* timer display */}
       <Text style={[styles.timer, { color: theme.colors.onSurface }]}>{formatDuration(seconds)}</Text>
 
-      {/* route info */}
       {routeName && (
         <View style={styles.routeRow}>
           <View style={[styles.routeIndicator, { backgroundColor: routeColor || theme.colors.primary }]} />
