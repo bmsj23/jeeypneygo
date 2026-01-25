@@ -20,6 +20,8 @@ export default function DriverHomeScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const activeTrip = useTripStore((state) => state.activeTrip);
+  const currentTripFare = useTripStore((state) => state.totalFare);
+  const currentTripPassengers = useTripStore((state) => state.regularPassengers + state.discountedPassengers);
 
   const { tripsToday, passengersToday, hoursOnline, earningsToday, isLoading, refetch } = useTodayStats(user?.id);
 
@@ -31,6 +33,10 @@ export default function DriverHomeScreen() {
     router.push('/(main)/drive');
   };
 
+  // combine historical earnings with current trip earnings
+  const totalEarningsToday = earningsToday + currentTripFare;
+  const totalPassengersToday = passengersToday + currentTripPassengers;
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
@@ -40,9 +46,9 @@ export default function DriverHomeScreen() {
       <WelcomeHeader user={user} />
 
       <EarningsCard
-        earningsToday={earningsToday}
+        earningsToday={totalEarningsToday}
         tripsToday={tripsToday}
-        passengersToday={passengersToday}
+        passengersToday={totalPassengersToday}
       />
 
       {activeTrip && (
@@ -57,7 +63,7 @@ export default function DriverHomeScreen() {
         isLoading={isLoading}
         tripsToday={tripsToday}
         hoursOnline={hoursOnline}
-        passengersToday={passengersToday}
+        passengersToday={totalPassengersToday}
       />
 
       <StartDrivingButton
