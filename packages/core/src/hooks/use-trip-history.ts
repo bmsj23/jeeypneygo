@@ -73,6 +73,7 @@ interface TodayStatsReturn {
   tripsToday: number;
   passengersToday: number;
   hoursOnline: number;
+  earningsToday: number;
   isLoading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
@@ -83,6 +84,7 @@ export function useTodayStats(driverId: string | undefined): TodayStatsReturn {
     tripsToday: 0,
     passengersToday: 0,
     hoursOnline: 0,
+    earningsToday: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -97,7 +99,6 @@ export function useTodayStats(driverId: string | undefined): TodayStatsReturn {
       setIsLoading(true);
       setError(null);
 
-      // get today's date range
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
@@ -124,8 +125,9 @@ export function useTodayStats(driverId: string | undefined): TodayStatsReturn {
       const trips: TripStats[] = data || [];
       const tripsToday = trips.length;
       const passengersToday = trips.reduce((sum, trip) => sum + (trip.total_passengers || 0), 0);
-      
-      // calculate hours online from trip durations
+
+      const earningsToday = passengersToday * 13;
+
       const totalSeconds = trips.reduce((sum, trip) => {
         const start = new Date(trip.started_at).getTime();
         const end = new Date(trip.ended_at).getTime();
@@ -133,7 +135,7 @@ export function useTodayStats(driverId: string | undefined): TodayStatsReturn {
       }, 0);
       const hoursOnline = Math.round((totalSeconds / 3600) * 10) / 10;
 
-      setStats({ tripsToday, passengersToday, hoursOnline });
+      setStats({ tripsToday, passengersToday, hoursOnline, earningsToday });
     } catch (err) {
       setError(err as Error);
       console.error('Error fetching today stats:', err);
