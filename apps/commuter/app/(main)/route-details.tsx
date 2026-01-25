@@ -15,6 +15,7 @@ import {
   type RouteWithStops,
   type Stop,
 } from '@jeepneygo/core';
+import { FareEstimator } from '../../components/fare-estimator';
 
 type ViewMode = 'stops' | 'jeepneys';
 
@@ -31,7 +32,6 @@ export default function RouteDetailsScreen() {
   const { trips, isLoading: tripsLoading } = useActiveTrips(routeId);
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
 
-  // find the selected route
   const route = useMemo(() => {
     return routes.find((r) => r.id === routeId) as RouteWithStops | undefined;
   }, [routes, routeId]);
@@ -86,7 +86,6 @@ export default function RouteDetailsScreen() {
     );
   }
 
-  // compute total passengers across all trips
   const totalPassengers = trips.reduce((sum, t) => sum + (t.passenger_count || 0), 0);
 
   return (
@@ -173,6 +172,17 @@ export default function RouteDetailsScreen() {
             <Text style={styles.discountText}>20% discount for students, seniors, and PWD</Text>
           </View>
         </View>
+
+        {/* fare estimator */}
+        {route.stops && route.stops.length > 1 && (
+          <View style={styles.fareEstimatorContainer}>
+            <FareEstimator
+              route={route}
+              stops={route.stops}
+              routeColor={routeColor}
+            />
+          </View>
+        )}
 
         {/* view mode tabs */}
         <View style={styles.tabsContainer}>
@@ -435,6 +445,10 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontWeight: '500',
     flex: 1,
+  },
+  fareEstimatorContainer: {
+    marginHorizontal: 20,
+    marginBottom: 16,
   },
   tabsContainer: {
     flexDirection: 'row',
