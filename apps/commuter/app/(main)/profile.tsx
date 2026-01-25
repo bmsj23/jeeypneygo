@@ -70,7 +70,6 @@ export default function ProfileScreen() {
       .slice(0, 2);
   };
 
-  // guest mode
   if (!isAuthenticated) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -268,7 +267,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
-  // guest styles
   guestHeader: {
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -345,7 +343,6 @@ const styles = StyleSheet.create({
   appVersion: {
     fontSize: 13,
   },
-  // authenticated styles
   profileHeader: {
     alignItems: 'center',
     paddingHorizontal: 20,

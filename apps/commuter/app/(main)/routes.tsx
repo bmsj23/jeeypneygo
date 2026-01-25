@@ -14,7 +14,6 @@ export default function RoutesScreen() {
   const { routes, isLoading, error } = useRoutes({ includeStops: true });
   const { trips } = useActiveTrips({});
 
-  // get active jeepney counts per route
   const routeCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     trips.forEach(trip => {

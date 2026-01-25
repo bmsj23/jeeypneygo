@@ -14,7 +14,6 @@ export default function FavoritesScreen() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { favorites, isLoading, removeFavorite } = useFavorites();
 
-  // group favorites by route
   const groupedFavorites = useMemo(() => {
     const groups: Record<string, typeof favorites> = {};
     favorites.forEach(fav => {
@@ -39,7 +38,6 @@ export default function FavoritesScreen() {
     await removeFavorite(stopId);
   };
 
-  // sign in required state
   if (!isAuthenticated) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -76,7 +74,6 @@ export default function FavoritesScreen() {
     );
   }
 
-  // loading state
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -92,7 +89,6 @@ export default function FavoritesScreen() {
     );
   }
 
-  // empty state
   if (favorites.length === 0) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>

@@ -40,7 +40,6 @@ export default function StopDetailsScreen() {
 
   const route = stop ? (stop as any).route as Route | undefined : undefined;
 
-  // calculate approaching jeepneys with eta
   const approachingJeepneys = useMemo((): ApproachingJeepney[] => {
     if (!stop || !trips.length) return [];
 
@@ -53,7 +52,6 @@ export default function StopDetailsScreen() {
           { latitude: trip.current_latitude!, longitude: trip.current_longitude! },
           { latitude: stop.latitude, longitude: stop.longitude }
         );
-        // calculate rough distance
         const R = 6371;
         const dLat = ((stop.latitude - trip.current_latitude!) * Math.PI) / 180;
         const dLon = ((stop.longitude - trip.current_longitude!) * Math.PI) / 180;
@@ -87,7 +85,6 @@ export default function StopDetailsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* header */}
       <View style={[styles.header, { paddingTop: insets.top + 12, backgroundColor: route?.color || theme.colors.primary }]}>
         <View style={styles.headerTop}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
@@ -118,7 +115,6 @@ export default function StopDetailsScreen() {
           )}
         </View>
 
-        {/* stats card */}
         <View style={[styles.statsCard, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: approachingJeepneys.length > 0 ? '#4CAF50' : theme.colors.onSurfaceVariant }]}>
@@ -149,7 +145,6 @@ export default function StopDetailsScreen() {
         </View>
       </View>
 
-      {/* content */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />

@@ -7,7 +7,6 @@ import { useAuthStore } from '@jeepneygo/core';
 export default function RootIndex() {
   const isLoading = useAuthStore((state) => state.isLoading);
 
-  // show loading while checking auth state
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -16,8 +15,6 @@ export default function RootIndex() {
     );
   }
 
-  // commuter app allows guest mode - go straight to main app
-  // auth is optional for viewing the map
   return <Redirect href="/(main)" />;
 }
 

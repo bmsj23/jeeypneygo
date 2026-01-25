@@ -4,7 +4,6 @@ import { useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// modern floating tab bar icon with indicator
 function TabBarIcon({
   name,
   nameFocused,
@@ -37,7 +36,6 @@ export default function MainLayout() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
-  // ensure minimum padding for ios home indicator
   const bottomPadding = Math.max(insets.bottom, 8);
 
   return (
