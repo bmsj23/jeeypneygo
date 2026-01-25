@@ -4,7 +4,6 @@ import * as SecureStore from 'expo-secure-store';
 import type { User, AuthState } from '../types/models';
 import { supabase } from '../services/supabase';
 
-// secure storage adapter for zustand persistence
 const secureStorage: StateStorage = {
   getItem: async (name: string) => {
     return await SecureStore.getItemAsync(name);
@@ -25,6 +24,7 @@ interface AuthStore extends AuthState {
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   setUser: (user: User | null) => void;
+  updateProfile: (updates: Partial<Pick<User, 'display_name' | 'phone' | 'email' | 'avatar_url'>>) => Promise<{ error: Error | null }>;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -38,7 +38,7 @@ export const useAuthStore = create<AuthStore>()(
       initialize: async () => {
         try {
           const { data: { session } } = await supabase.auth.getSession();
-          
+
           if (session?.user) {
             const { data: profile } = await supabase
               .from('users')
@@ -150,7 +150,6 @@ export const useAuthStore = create<AuthStore>()(
 
           if (error) return { error: new Error(error.message) };
 
-          // profile will be created via database trigger
           return { error: null };
         } catch (error) {
           return { error: error as Error };
@@ -167,6 +166,38 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       setUser: (user: User | null) => set({ user }),
+
+      updateProfile: async (updates) => {
+        try {
+          const currentUser = get().user;
+          if (!currentUser) {
+            return { error: new Error('No user logged in') };
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data, error } = await (supabase as any)
+            .from('users')
+            .update({
+              display_name: updates.display_name,
+              phone: updates.phone,
+              email: updates.email,
+              avatar_url: updates.avatar_url,
+            })
+            .eq('id', currentUser.id)
+            .select()
+            .single();
+
+          if (error) {
+            return { error: new Error(error.message) };
+          }
+
+          set({ user: data });
+
+          return { error: null };
+        } catch (error) {
+          return { error: error as Error };
+        }
+      },
     }),
     {
       name: 'jeepneygo-auth',
