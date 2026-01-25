@@ -131,8 +131,9 @@ export default function ProfileScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
-      contentContainerStyle={styles.authenticatedContent}
+      contentContainerStyle={[styles.authenticatedContent, { paddingBottom: insets.bottom + 8 }]}
       showsVerticalScrollIndicator={false}
+      bounces={false}
     >
       <ProfileHeader user={user} paddingTop={insets.top} />
       <ProfileStats isLoading={false} favoritesCount={favorites.length} tripsCount={0} />
@@ -141,7 +142,6 @@ export default function ProfileScreen() {
       <MenuSection title="Support" items={supportItems} />
       <SignOutButton onSignOut={handleSignOut} />
       <ProfileFooter version={APP_VERSION} />
-      <View style={{ height: insets.bottom + 16 }} />
     </ScrollView>
   );
 }
@@ -158,6 +158,6 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   authenticatedContent: {
-    paddingBottom: 16,
+    flexGrow: 1,
   },
 });
