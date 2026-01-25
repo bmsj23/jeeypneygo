@@ -12,6 +12,7 @@ export * from './hooks/use-active-trips';
 export * from './hooks/use-routes';
 export * from './hooks/use-driver-vehicle';
 export * from './hooks/use-location-tracking';
+export * from './hooks/use-compass-heading';
 export * from './hooks/use-trip-history';
 export * from './hooks/use-network-status';
 export * from './hooks/use-stops';
