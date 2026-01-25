@@ -1,30 +1,51 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { Text, useTheme, Checkbox } from 'react-native-paper';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { Button, Input, ScreenContainer } from '@jeepneygo/ui';
-import { useAuthStore, supabase } from '@jeepneygo/core';
+import { useAuthStore } from '@jeepneygo/core';
+import {
+  RegisterHeader,
+  RegisterStep1,
+  RegisterStep2,
+  RegisterStep3,
+  RegisterFooter,
+} from '../../components/auth';
+
+const COLORS = {
+  background: '#FFFFFF',
+};
+
+type Step = 1 | 2 | 3;
+
+interface FormData {
+  displayName: string;
+  phone: string;
+  email: string;
+  licenseNumber: string;
+  licenseExpiry: string;
+}
 
 export default function DriverRegisterScreen() {
-  const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const signInWithPhone = useAuthStore((state) => state.signInWithPhone);
 
-  const [formData, setFormData] = useState({
+  const [currentStep, setCurrentStep] = useState<Step>(1);
+  const [formData, setFormData] = useState<FormData>({
     displayName: '',
     phone: '',
+    email: '',
     licenseNumber: '',
-    address: '',
+    licenseExpiry: '',
   });
   const [licensePhoto, setLicensePhoto] = useState<string | null>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const updateField = (field: string, value: string) => {
+  const updateField = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    // clear error when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: '' }));
     }
@@ -32,12 +53,8 @@ export default function DriverRegisterScreen() {
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
     if (status !== 'granted') {
-      setErrors((prev) => ({
-        ...prev,
-        licensePhoto: 'Permission to access photos is required',
-      }));
+      setErrors((prev) => ({ ...prev, licensePhoto: 'Permission required' }));
       return;
     }
 
@@ -56,12 +73,8 @@ export default function DriverRegisterScreen() {
 
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    
     if (status !== 'granted') {
-      setErrors((prev) => ({
-        ...prev,
-        licensePhoto: 'Permission to access camera is required',
-      }));
+      setErrors((prev) => ({ ...prev, licensePhoto: 'Permission required' }));
       return;
     }
 
@@ -77,11 +90,11 @@ export default function DriverRegisterScreen() {
     }
   };
 
-  const validate = (): boolean => {
+  const validateStep1 = (): boolean => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.displayName.trim()) {
-      newErrors.displayName = 'Full name is required';
+      newErrors.displayName = 'Name is required';
     }
 
     const phoneRegex = /^(\+63|0)?9\d{9}$/;
@@ -91,56 +104,87 @@ export default function DriverRegisterScreen() {
       newErrors.phone = 'Please enter a valid Philippine phone number';
     }
 
-    if (!formData.licenseNumber.trim()) {
-      newErrors.licenseNumber = 'License number is required';
-    }
-
-    if (!licensePhoto) {
-      newErrors.licensePhoto = 'Please upload a photo of your license';
-    }
-
-    if (!agreedToTerms) {
-      newErrors.terms = 'You must agree to the terms and conditions';
+    if (formData.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        newErrors.email = 'Please enter a valid email';
+      }
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  const validateStep2 = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.licenseNumber.trim()) {
+      newErrors.licenseNumber = 'License number is required';
+    }
+
+    if (!formData.licenseExpiry.trim()) {
+      newErrors.licenseExpiry = 'License expiry date is required';
+    }
+
+    if (!licensePhoto) {
+      newErrors.licensePhoto = 'Please upload your license photo';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateStep3 = (): boolean => {
+    if (!agreedToTerms) {
+      setErrors({ terms: 'You must agree to the terms and conditions' });
+      return false;
+    }
+    return true;
+  };
+
+  const handleNext = () => {
+    if (currentStep === 1 && validateStep1()) {
+      setCurrentStep(2);
+    } else if (currentStep === 2 && validateStep2()) {
+      setCurrentStep(3);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep((prev) => (prev - 1) as Step);
+    } else {
+      router.back();
+    }
+  };
+
   const handleRegister = async () => {
-    if (!validate()) return;
+    if (!validateStep3()) return;
 
     setIsLoading(true);
 
     try {
-      // format phone number
       const formattedPhone = formData.phone.startsWith('+63')
         ? formData.phone
         : formData.phone.startsWith('0')
         ? `+63${formData.phone.slice(1)}`
         : `+63${formData.phone}`;
 
-      // send otp to verify phone
-      const { error: otpError } = await signInWithPhone(formattedPhone);
+      const { error: signInError } = await signInWithPhone(formattedPhone);
 
-      if (otpError) {
-        setErrors({ phone: otpError.message });
-        return;
+      if (signInError) {
+        setErrors({ general: signInError.message });
+      } else {
+        router.push({
+          pathname: '/(auth)/otp',
+          params: {
+            phone: formattedPhone,
+            isNewUser: 'true',
+            displayName: formData.displayName,
+          },
+        });
       }
-
-      // navigate to otp screen with registration data
-      router.push({
-        pathname: '/(auth)/otp',
-        params: {
-          phone: formattedPhone,
-          isRegistration: 'true',
-          displayName: formData.displayName,
-          licenseNumber: formData.licenseNumber,
-          address: formData.address,
-          licensePhotoUri: licensePhoto,
-        },
-      });
-    } catch (err) {
+    } catch {
       setErrors({ general: 'Something went wrong. Please try again.' });
     } finally {
       setIsLoading(false);
@@ -148,218 +192,83 @@ export default function DriverRegisterScreen() {
   };
 
   return (
-    <ScreenContainer avoidKeyboard scrollable>
-      <View style={styles.header}>
-        <Text variant="headlineMedium" style={styles.title}>
-          Driver Registration
-        </Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
-          Join JeepneyGo as a driver partner
-        </Text>
-      </View>
-
-      <View style={styles.form}>
-        <Input
-          label="Full Name"
-          value={formData.displayName}
-          onChangeText={(value) => updateField('displayName', value)}
-          placeholder="Juan Dela Cruz"
-          left={<Input.Icon icon="account" />}
-          errorMessage={errors.displayName}
-          error={!!errors.displayName}
-          disabled={isLoading}
-        />
-
-        <Input
-          label="Phone Number"
-          value={formData.phone}
-          onChangeText={(value) => updateField('phone', value)}
-          keyboardType="phone-pad"
-          placeholder="09XX XXX XXXX"
-          left={<Input.Icon icon="phone" />}
-          errorMessage={errors.phone}
-          error={!!errors.phone}
-          disabled={isLoading}
-        />
-
-        <Input
-          label="Driver's License Number"
-          value={formData.licenseNumber}
-          onChangeText={(value) => updateField('licenseNumber', value)}
-          placeholder="N01-23-456789"
-          left={<Input.Icon icon="card-account-details" />}
-          errorMessage={errors.licenseNumber}
-          error={!!errors.licenseNumber}
-          disabled={isLoading}
-          autoCapitalize="characters"
-        />
-
-        <Input
-          label="Address (Optional)"
-          value={formData.address}
-          onChangeText={(value) => updateField('address', value)}
-          placeholder="Lipa City, Batangas"
-          left={<Input.Icon icon="map-marker" />}
-          disabled={isLoading}
-        />
-
-        <View style={styles.photoSection}>
-          <Text variant="titleSmall" style={styles.photoLabel}>
-            Driver's License Photo
-          </Text>
-          <Text variant="bodySmall" style={styles.photoHint}>
-            Take a clear photo of your driver's license
-          </Text>
-
-          <View style={styles.photoButtons}>
-            <Button
-              mode="outlined"
-              onPress={takePhoto}
-              icon="camera"
-              style={styles.photoButton}
-              disabled={isLoading}
-            >
-              Camera
-            </Button>
-            <Button
-              mode="outlined"
-              onPress={pickImage}
-              icon="image"
-              style={styles.photoButton}
-              disabled={isLoading}
-            >
-              Gallery
-            </Button>
-          </View>
-
-          {licensePhoto && (
-            <View style={styles.photoPreviewContainer}>
-              <Text variant="bodySmall" style={{ color: theme.colors.primary }}>
-                Photo selected
-              </Text>
-            </View>
-          )}
-
-          {errors.licensePhoto && (
-            <Text variant="bodySmall" style={[styles.errorText, { color: theme.colors.error }]}>
-              {errors.licensePhoto}
-            </Text>
-          )}
-        </View>
-
-        <Pressable
-          style={styles.termsRow}
-          onPress={() => setAgreedToTerms(!agreedToTerms)}
-          disabled={isLoading}
+    <View style={[styles.container, { backgroundColor: COLORS.background }]}>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <Checkbox
-            status={agreedToTerms ? 'checked' : 'unchecked'}
-            onPress={() => setAgreedToTerms(!agreedToTerms)}
-            disabled={isLoading}
+          <RegisterHeader currentStep={currentStep} onBack={handleBack} />
+
+          {currentStep === 1 && (
+            <RegisterStep1
+              displayName={formData.displayName}
+              phone={formData.phone}
+              email={formData.email}
+              errors={errors}
+              isLoading={isLoading}
+              onDisplayNameChange={(text) => updateField('displayName', text)}
+              onPhoneChange={(text) => updateField('phone', text)}
+              onEmailChange={(text) => updateField('email', text)}
+            />
+          )}
+
+          {currentStep === 2 && (
+            <RegisterStep2
+              licenseNumber={formData.licenseNumber}
+              licenseExpiry={formData.licenseExpiry}
+              licensePhoto={licensePhoto}
+              errors={errors}
+              isLoading={isLoading}
+              onLicenseNumberChange={(text) => updateField('licenseNumber', text)}
+              onLicenseExpiryChange={(text) => updateField('licenseExpiry', text)}
+              onTakePhoto={takePhoto}
+              onPickImage={pickImage}
+              onRemovePhoto={() => setLicensePhoto(null)}
+            />
+          )}
+
+          {currentStep === 3 && (
+            <RegisterStep3
+              displayName={formData.displayName}
+              phone={formData.phone}
+              licenseNumber={formData.licenseNumber}
+              agreedToTerms={agreedToTerms}
+              errors={errors}
+              onToggleTerms={() => setAgreedToTerms(!agreedToTerms)}
+            />
+          )}
+
+          <RegisterFooter
+            currentStep={currentStep}
+            isLoading={isLoading}
+            onContinue={handleNext}
+            onRegister={handleRegister}
+            onSignIn={() => router.push('/(auth)/login')}
           />
-          <Text variant="bodySmall" style={styles.termsText}>
-            I agree to the Terms of Service and Privacy Policy
-          </Text>
-        </Pressable>
-        {errors.terms && (
-          <Text variant="bodySmall" style={[styles.errorText, { color: theme.colors.error }]}>
-            {errors.terms}
-          </Text>
-        )}
-
-        {errors.general && (
-          <Text variant="bodySmall" style={[styles.errorText, { color: theme.colors.error }]}>
-            {errors.general}
-          </Text>
-        )}
-
-        <Button
-          mode="contained"
-          size="large"
-          fullWidth
-          onPress={handleRegister}
-          loading={isLoading}
-          disabled={isLoading}
-          style={styles.registerButton}
-        >
-          Continue
-        </Button>
-      </View>
-
-      <View style={styles.footer}>
-        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-          Already have an account?
-        </Text>
-        <Button mode="text" onPress={() => router.back()} compact>
-          Sign In
-        </Button>
-      </View>
-    </ScreenContainer>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    marginTop: 20,
-    marginBottom: 32,
-  },
-  title: {
-    fontWeight: 'bold',
-    color: '#1A237E',
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: '#757575',
-  },
-  form: {
+  container: {
     flex: 1,
   },
-  photoSection: {
-    marginBottom: 16,
-  },
-  photoLabel: {
-    marginBottom: 4,
-    color: '#212121',
-  },
-  photoHint: {
-    color: '#757575',
-    marginBottom: 12,
-  },
-  photoButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  photoButton: {
+  keyboardView: {
     flex: 1,
   },
-  photoPreviewContainer: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#E8F5E9',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  termsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  termsText: {
-    flex: 1,
-    color: '#757575',
-  },
-  errorText: {
-    marginTop: 4,
-    marginLeft: 4,
-  },
-  registerButton: {
-    marginTop: 24,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 4,
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
   },
 });
