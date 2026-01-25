@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { Text, useTheme, ActivityIndicator } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,7 +14,7 @@ export default function DriverHomeScreen() {
   const user = useAuthStore((state) => state.user);
   const activeTrip = useTripStore((state) => state.activeTrip);
 
-  const { tripsToday, passengersToday, hoursOnline, isLoading, refetch } = useTodayStats(user?.id);
+  const { tripsToday, passengersToday, hoursOnline, earningsToday, isLoading, refetch } = useTodayStats(user?.id);
 
   useEffect(() => {
     refetch();
@@ -22,16 +22,14 @@ export default function DriverHomeScreen() {
 
   const getGreeting = (): string => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
+    if (hour < 12) return 'Good morning,';
+    if (hour < 18) return 'Good afternoon,';
+    return 'Good evening,';
   };
 
   const handleStartDriving = () => {
     router.push('/(main)/drive');
   };
-
-  const todayEarnings = tripsToday * 150;
 
   return (
     <ScrollView
@@ -39,7 +37,6 @@ export default function DriverHomeScreen() {
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* header */}
       <View style={styles.header}>
         <View>
           <Text style={[styles.greeting, { color: theme.colors.onSurfaceVariant }]}>{getGreeting()}</Text>
@@ -51,17 +48,20 @@ export default function DriverHomeScreen() {
           onPress={() => router.push('/(main)/profile')}
           style={[styles.profileButton, { backgroundColor: theme.colors.surfaceVariant }]}
         >
-          <MaterialCommunityIcons name="account" size={24} color={theme.colors.onSurfaceVariant} />
+          {user?.avatar_url ? (
+            <Image source={{ uri: user.avatar_url }} style={styles.profileImage} />
+          ) : (
+            <MaterialCommunityIcons name="account" size={24} color={theme.colors.onSurfaceVariant} />
+          )}
         </Pressable>
       </View>
 
-      {/* earnings hero card */}
       <View style={[styles.earningsCard, { backgroundColor: theme.colors.primary }]}>
         <View style={styles.earningsHeader}>
           <Text style={styles.earningsLabel}>Today's Earnings</Text>
           <MaterialCommunityIcons name="wallet" size={24} color="rgba(0,0,0,0.3)" />
         </View>
-        <Text style={styles.earningsAmount}>₱{todayEarnings.toFixed(2)}</Text>
+        <Text style={styles.earningsAmount}>₱{earningsToday.toFixed(2)}</Text>
         <View style={styles.earningsFooter}>
           <View style={styles.earningsFooterItem}>
             <MaterialCommunityIcons name="car" size={16} color="rgba(0,0,0,0.5)" />
@@ -74,7 +74,6 @@ export default function DriverHomeScreen() {
         </View>
       </View>
 
-      {/* active trip banner */}
       {activeTrip && (
         <Pressable
           onPress={handleStartDriving}
@@ -93,7 +92,6 @@ export default function DriverHomeScreen() {
         </Pressable>
       )}
 
-      {/* stats grid */}
       <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Today's Summary</Text>
       <View style={styles.statsGrid}>
         {isLoading ? (
@@ -109,24 +107,28 @@ export default function DriverHomeScreen() {
         )}
       </View>
 
-      {/* start driving CTA */}
       <View style={styles.ctaSection}>
-        <Button mode="contained" onPress={handleStartDriving} style={styles.ctaButton}>
+        <Pressable
+          onPress={handleStartDriving}
+          style={({ pressed }) => [
+            styles.ctaButton,
+            { backgroundColor: pressed ? '#E5A700' : theme.colors.primary }
+          ]}
+        >
           <View style={styles.ctaContent}>
             <MaterialCommunityIcons name="steering" size={24} color="#000000" />
             <Text style={styles.ctaText}>{activeTrip ? 'Continue Driving' : 'Start Driving'}</Text>
           </View>
-        </Button>
+        </Pressable>
         <Text style={[styles.ctaHint, { color: theme.colors.onSurfaceVariant }]}>
           {activeTrip ? 'Return to your active trip' : 'Go online and start accepting trips'}
         </Text>
       </View>
 
-      {/* quick actions */}
       <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Quick Actions</Text>
       <View style={styles.quickActionsRow}>
         <Pressable
-          onPress={() => router.push('/(main)/history')}
+          onPress={() => router.push('/history')}
           style={[styles.quickActionCard, { backgroundColor: theme.colors.surface }]}
         >
           <View style={[styles.quickActionIcon, { backgroundColor: '#E3F2FD' }]}>
@@ -152,8 +154,10 @@ export default function DriverHomeScreen() {
         </Pressable>
       </View>
 
-      {/* vehicle info card */}
-      <Pressable style={[styles.vehicleCard, { backgroundColor: theme.colors.surface }]}>
+      <Pressable
+        onPress={() => router.push('/vehicle-info')}
+        style={[styles.vehicleCard, { backgroundColor: theme.colors.surface }]}
+      >
         <View style={[styles.vehicleIcon, { backgroundColor: theme.colors.primaryContainer }]}>
           <MaterialCommunityIcons name="bus" size={28} color={theme.colors.primary} />
         </View>
@@ -166,8 +170,7 @@ export default function DriverHomeScreen() {
         <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.onSurfaceVariant} />
       </Pressable>
 
-      {/* bottom padding for tab bar */}
-      <View style={{ height: 100 }} />
+      <View style={{ height: 32 }} />
     </ScrollView>
   );
 }
@@ -199,6 +202,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  profileImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   earningsCard: {
     borderRadius: 20,
@@ -291,7 +300,9 @@ const styles = StyleSheet.create({
   ctaButton: {
     width: '100%',
     borderRadius: 28,
-    paddingVertical: 8,
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   ctaContent: {
     flexDirection: 'row',
