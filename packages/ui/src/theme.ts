@@ -1,6 +1,5 @@
 import { MD3LightTheme, configureFonts } from 'react-native-paper';
 
-// jeepneygo design system colors
 const colors = {
   jeepneyYellow: '#FFB800',
   deepBlue: '#1A237E',
@@ -13,7 +12,6 @@ const colors = {
   white: '#FFFFFF',
 };
 
-// base theme configuration
 export const theme = {
   ...MD3LightTheme,
   colors: {
@@ -42,16 +40,13 @@ export const theme = {
   fonts: configureFonts({ config: {} }),
 };
 
-// driver app theme - emphasizes action buttons
 export const driverTheme = {
   ...theme,
   colors: {
     ...theme.colors,
-    // larger touch targets for driver interface
   },
 };
 
-// commuter app theme - same as base for now
 export const commuterTheme = {
   ...theme,
 };
