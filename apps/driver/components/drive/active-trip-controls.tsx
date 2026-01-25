@@ -108,8 +108,8 @@ export function ActiveTripControls({
 
 const styles = StyleSheet.create({
   fareSection: {
-    marginTop: 20,
-    marginBottom: 20,
+    marginTop: 16,
+    marginBottom: 16,
   },
   undoButton: {
     flexDirection: 'row',
@@ -127,6 +127,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 8,
   },
   actionButton: {
     flex: 1,
