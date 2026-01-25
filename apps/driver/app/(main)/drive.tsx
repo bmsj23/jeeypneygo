@@ -1,19 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { View, StyleSheet, Dimensions, ScrollView, Alert, Pressable, Platform } from 'react-native';
-import { Text, useTheme, ActivityIndicator, Snackbar, Portal, Modal } from 'react-native-paper';
+import { Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapView, { Marker, PROVIDER_DEFAULT, Region } from 'react-native-maps';
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import {
-  Button,
-  RouteCard,
-  PassengerStepper,
-  TripTimer,
-  EarningsBadge,
-  EmptyState,
-} from '@jeepneygo/ui';
+import MapView, { Marker, PROVIDER_DEFAULT, Region } from 'react-native-maps';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { EarningsBadge } from '@jeepneygo/ui';
 import {
   useAuthStore,
   useTripStore,
@@ -25,8 +17,16 @@ import {
   type Route,
   type TripSummary,
 } from '@jeepneygo/core';
+import { CustomBottomSheet, CustomBottomSheetRef } from '../../components/custom-bottom-sheet';
+import {
+  IdleState,
+  RouteSelection,
+  ActiveTripControls,
+  TripSummaryModal,
+  LoadingOverlay,
+} from '../../components/drive';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
 const MANILA_REGION: Region = {
   latitude: 14.5995,
@@ -42,9 +42,8 @@ export default function DriveScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const mapRef = useRef<MapView>(null);
-  const bottomSheetRef = useRef<BottomSheet>(null);
+  const bottomSheetRef = useRef<CustomBottomSheetRef>(null);
 
-  // trip store
   const {
     activeTrip,
     selectedRoute,
@@ -53,38 +52,34 @@ export default function DriveScreen() {
     setSelectedRoute,
     setVehicle,
     startTrip,
-    updatePassengerCount,
     updateLocation,
     endTrip,
     pauseTrip,
     resumeTrip,
+    fareEntries,
+    totalFare,
+    regularPassengers,
+    discountedPassengers,
+    logFare,
+    undoLastFare,
   } = useTripStore();
 
-  // hooks
-  const { routes, isLoading: routesLoading } = useRoutes({ includeStops: true });
+  const { routes, isLoading: routesLoading } = useRoutes();
   const { vehicle, isLoading: vehicleLoading } = useDriverVehicle(user?.id);
   const { isOnline } = useNetworkStatus();
-
-  // get other drivers on the same route
   const { trips: otherDrivers } = useActiveTrips({
     routeId: activeTrip?.route_id || selectedRoute?.id || undefined,
   });
 
-  // local state
   const [driveState, setDriveState] = useState<DriveState>('idle');
   const [tripSummary, setTripSummary] = useState<TripSummary | null>(null);
   const [tripDuration, setTripDuration] = useState(0);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [pendingRoute, setPendingRoute] = useState<Route | null>(null);
-
-  // earnings
+  const [isGoOnlinePressed, setIsGoOnlinePressed] = useState(false);
   const [todayEarnings] = useState(0);
 
-  // track bottom sheet position for map padding
-  const [bottomSheetHeight, setBottomSheetHeight] = useState(height * 0.2);
-
-  // location tracking
   const shouldTrackLocation = driveState !== 'summary';
   const activeTripRef = useRef(activeTrip);
   const updateLocationRef = useRef(updateLocation);
@@ -109,103 +104,110 @@ export default function DriveScreen() {
     onLocationUpdate: handleLocationUpdate,
   });
 
-  // request location permission on mount
   useEffect(() => {
     if (hasPermission === null) {
       requestPermission();
     }
   }, [hasPermission, requestPermission]);
 
-  // set vehicle in store when loaded
   useEffect(() => {
     if (vehicle) {
       setVehicle(vehicle);
     }
   }, [vehicle, setVehicle]);
 
-  // determine drive state based on active trip
   useEffect(() => {
     if (activeTrip) {
       setDriveState('active');
+      bottomSheetRef.current?.snapToIndex(1);
     } else if (tripSummary) {
       setDriveState('summary');
       setShowSummaryModal(true);
     } else {
       setDriveState('idle');
+      bottomSheetRef.current?.snapToIndex(0);
     }
   }, [activeTrip, tripSummary]);
 
-  // trip duration timer
+  const pausedDurationRef = useRef(0);
+  const lastPauseTimeRef = useRef<number | null>(null);
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
 
     if (activeTrip) {
       const startTime = new Date(activeTrip.started_at).getTime();
 
+      if (activeTrip.status === 'paused') {
+        if (lastPauseTimeRef.current === null) {
+          lastPauseTimeRef.current = Date.now();
+        }
+        return;
+      } else {
+        if (lastPauseTimeRef.current !== null) {
+          pausedDurationRef.current += Date.now() - lastPauseTimeRef.current;
+          lastPauseTimeRef.current = null;
+        }
+      }
+
       const updateDuration = () => {
         const now = Date.now();
-        setTripDuration(Math.floor((now - startTime) / 1000));
+        const totalElapsed = now - startTime - pausedDurationRef.current;
+        setTripDuration(Math.floor(totalElapsed / 1000));
       };
 
       updateDuration();
       interval = setInterval(updateDuration, 1000);
+    } else {
+      pausedDurationRef.current = 0;
+      lastPauseTimeRef.current = null;
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [activeTrip]);
+  }, [activeTrip, activeTrip?.status]);
 
-  // center map on user location
+  const hasInitializedMap = useRef(false);
   useEffect(() => {
-    if (currentLocation && mapRef.current) {
+    if (currentLocation && mapRef.current && !hasInitializedMap.current) {
+      hasInitializedMap.current = true;
       mapRef.current.animateToRegion({
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
       });
     }
   }, [currentLocation?.latitude, currentLocation?.longitude]);
 
-  // bottom sheet snap points
   const snapPoints = useMemo(() => {
+    const tabBarHeight = Platform.OS === 'ios' ? 88 : 64;
     if (driveState === 'active') {
-      return ['25%', '50%'];
+      return [
+        Math.round(height * 0.20) + tabBarHeight,
+        Math.round(height * 0.42) + tabBarHeight,
+      ];
     }
     if (driveState === 'selecting-route') {
-      return ['40%', '75%'];
+      return [
+        Math.round(height * 0.30) + tabBarHeight,
+        Math.round(height * 0.70) + tabBarHeight,
+      ];
     }
-    return ['20%', '45%'];
+    return [Math.round(height * 0.28) + tabBarHeight];
   }, [driveState]);
 
-  // handle bottom sheet position changes for map padding
-  const handleSheetChange = useCallback((index: number) => {
-    // calculate the height based on snap point percentage
-    const percentages = driveState === 'active'
-      ? [0.25, 0.50]
-      : driveState === 'selecting-route'
-        ? [0.40, 0.75]
-        : [0.20, 0.45];
-    const sheetHeight = height * (percentages[index] ?? percentages[0]);
-    setBottomSheetHeight(sheetHeight);
-  }, [driveState]);
-
-  // calculate map padding to keep marker visible above the bottom sheet
-  // add extra padding so marker appears in upper portion of visible map area
   const mapPadding = useMemo(() => {
-    const tabBarHeight = Platform.OS === 'ios' ? 88 : 64;
-    // bottom padding = sheet height + some extra to position marker in upper visible area
-    const bottomPadding = bottomSheetHeight + 40;
+    const sheetHeight = snapPoints[0] ?? 200;
     return {
       top: insets.top + 60,
       right: 0,
-      bottom: bottomPadding + tabBarHeight,
+      bottom: sheetHeight,
       left: 0,
     };
-  }, [bottomSheetHeight, insets.top]);
+  }, [snapPoints, insets.top]);
 
-  // handlers
   const handleGoOnline = () => {
     setDriveState('selecting-route');
     bottomSheetRef.current?.snapToIndex(1);
@@ -230,8 +232,7 @@ export default function DriveScreen() {
       return;
     }
 
-    let locationToUse: { latitude: number; longitude: number; heading: number; speed: number } | null =
-      currentLocation;
+    let locationToUse = currentLocation;
 
     if (!locationToUse) {
       setIsGettingLocation(true);
@@ -244,6 +245,8 @@ export default function DriveScreen() {
           longitude: loc.coords.longitude,
           heading: loc.coords.heading ?? 0,
           speed: loc.coords.speed ?? 0,
+          accuracy: loc.coords.accuracy ?? 0,
+          timestamp: loc.timestamp,
         };
       } catch {
         Alert.alert('Location Error', 'Unable to get your current location.');
@@ -274,21 +277,6 @@ export default function DriveScreen() {
       Alert.alert('Error', result.error?.message || 'Failed to start trip');
     } else {
       bottomSheetRef.current?.snapToIndex(0);
-    }
-  };
-
-  const handlePassengerIncrement = () => {
-    if (!activeTrip) return;
-    const maxCapacity = vehicle?.capacity ?? 20;
-    if (activeTrip.passenger_count < maxCapacity) {
-      updatePassengerCount(activeTrip.passenger_count + 1);
-    }
-  };
-
-  const handlePassengerDecrement = () => {
-    if (!activeTrip) return;
-    if (activeTrip.passenger_count > 0) {
-      updatePassengerCount(activeTrip.passenger_count - 1);
     }
   };
 
@@ -331,19 +319,17 @@ export default function DriveScreen() {
       mapRef.current.animateToRegion({
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
       });
     }
   };
 
-  // filter out current driver from other drivers list
   const filteredOtherDrivers = useMemo(() => {
     if (!activeTrip) return otherDrivers;
     return otherDrivers.filter((t) => t.driver_id !== user?.id);
   }, [otherDrivers, activeTrip, user?.id]);
 
-  // get current route details
   const currentRoute = useMemo(() => {
     if (activeTrip) {
       return routes.find((r) => r.id === activeTrip.route_id);
@@ -351,196 +337,64 @@ export default function DriveScreen() {
     return selectedRoute;
   }, [activeTrip, routes, selectedRoute]);
 
-  // render idle state (go online button)
-  const renderIdleSheet = () => (
-    <View style={styles.sheetContent}>
-      <View style={styles.sheetHeader}>
-        <Text style={[styles.sheetTitle, { color: theme.colors.onSurface }]}>Ready to Drive?</Text>
-        <Text style={[styles.sheetSubtitle, { color: theme.colors.onSurfaceVariant }]}>
-          Go online to start accepting trips
-        </Text>
-      </View>
-
-      <Button mode="contained" onPress={handleGoOnline} style={styles.goOnlineButton}>
-        GO ONLINE
-      </Button>
-
-      {!vehicle && !vehicleLoading && (
-        <View style={[styles.warningBanner, { backgroundColor: theme.colors.errorContainer }]}>
-          <MaterialCommunityIcons name="alert" size={20} color={theme.colors.error} />
-          <Text style={[styles.warningText, { color: theme.colors.onErrorContainer }]}>
-            No vehicle assigned. Contact admin.
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-
-  // render route selection
-  const renderRouteSelectionSheet = () => (
-    <BottomSheetScrollView contentContainerStyle={styles.sheetContent}>
-      <View style={styles.sheetHeader}>
-        <Text style={[styles.sheetTitle, { color: theme.colors.onSurface }]}>Select Your Route</Text>
-        <Text style={[styles.sheetSubtitle, { color: theme.colors.onSurfaceVariant }]}>
-          Choose a route to start your trip
-        </Text>
-      </View>
-
-      {routesLoading ? (
-        <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 32 }} />
-      ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.routeCardsContainer}
-        >
-          {routes.map((route) => (
-            <RouteCard
-              key={route.id}
-              name={route.name}
-              shortName={route.short_name}
-              color={route.color}
-              operatingHours={`${route.operating_start} - ${route.operating_end}`}
-              baseFare={route.base_fare}
-              onPress={() => handleSelectRoute(route)}
-              isSelected={pendingRoute?.id === route.id}
-              isLoading={isGettingLocation && pendingRoute?.id === route.id}
-            />
-          ))}
-        </ScrollView>
-      )}
-
-      <Pressable
-        onPress={() => setDriveState('idle')}
-        style={[styles.cancelButton, { backgroundColor: theme.colors.surfaceVariant }]}
-      >
-        <Text style={[styles.cancelButtonText, { color: theme.colors.onSurfaceVariant }]}>Cancel</Text>
-      </Pressable>
-    </BottomSheetScrollView>
-  );
-
-  // render active trip controls
-  const renderActiveTripSheet = () => (
-    <BottomSheetScrollView contentContainerStyle={styles.sheetContent}>
-      {/* trip timer */}
-      <TripTimer
-        seconds={tripDuration}
-        status={activeTrip?.status === 'paused' ? 'paused' : 'active'}
-        routeName={currentRoute?.name}
-        routeColor={currentRoute?.color}
-      />
-
-      {/* passenger stepper */}
-      <View style={styles.passengerSection}>
-        <PassengerStepper
-          value={activeTrip?.passenger_count ?? 0}
-          maxValue={vehicle?.capacity ?? 20}
-          onIncrement={handlePassengerIncrement}
-          onDecrement={handlePassengerDecrement}
+  const renderSheetContent = () => {
+    if (driveState === 'active') {
+      return (
+        <ActiveTripControls
+          activeTrip={activeTrip}
+          tripDuration={tripDuration}
+          routeName={currentRoute?.name}
+          routeColor={currentRoute?.color}
+          totalFare={totalFare}
+          regularPassengers={regularPassengers}
+          discountedPassengers={discountedPassengers}
+          fareEntries={fareEntries}
+          isEndingTrip={isEndingTrip}
+          onLogFare={logFare}
+          onUndoLastFare={undoLastFare}
+          onTogglePause={handleTogglePause}
+          onEndTrip={handleEndTrip}
         />
-      </View>
+      );
+    }
 
-      {/* action buttons */}
-      <View style={styles.tripActions}>
-        <Pressable
-          onPress={handleTogglePause}
-          style={[
-            styles.actionButton,
-            { backgroundColor: activeTrip?.status === 'paused' ? '#4CAF50' : theme.colors.surfaceVariant },
-          ]}
-        >
-          <MaterialCommunityIcons
-            name={activeTrip?.status === 'paused' ? 'play' : 'pause'}
-            size={24}
-            color={activeTrip?.status === 'paused' ? '#FFFFFF' : theme.colors.onSurfaceVariant}
-          />
-          <Text
-            style={[
-              styles.actionButtonText,
-              { color: activeTrip?.status === 'paused' ? '#FFFFFF' : theme.colors.onSurfaceVariant },
-            ]}
-          >
-            {activeTrip?.status === 'paused' ? 'Resume' : 'Pause'}
-          </Text>
-        </Pressable>
+    if (driveState === 'selecting-route') {
+      return (
+        <RouteSelection
+          routes={routes}
+          isLoading={routesLoading}
+          pendingRoute={pendingRoute}
+          isGettingLocation={isGettingLocation}
+          onSelectRoute={handleSelectRoute}
+          onCancel={() => setDriveState('idle')}
+        />
+      );
+    }
 
-        <Pressable
-          onPress={handleEndTrip}
-          disabled={isEndingTrip}
-          style={[styles.actionButton, styles.endTripButton, { backgroundColor: theme.colors.error }]}
-        >
-          {isEndingTrip ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <MaterialCommunityIcons name="stop" size={24} color="#FFFFFF" />
-              <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>End Trip</Text>
-            </>
-          )}
-        </Pressable>
-      </View>
-    </BottomSheetScrollView>
-  );
-
-  // render trip summary modal
-  const renderSummaryModal = () => (
-    <Portal>
-      <Modal
-        visible={showSummaryModal}
-        onDismiss={handleNewTrip}
-        contentContainerStyle={[styles.summaryModal, { backgroundColor: theme.colors.surface }]}
-      >
-        <View style={styles.summaryContent}>
-          <MaterialCommunityIcons name="check-circle" size={64} color="#4CAF50" />
-          <Text style={[styles.summaryTitle, { color: theme.colors.onSurface }]}>Trip Complete!</Text>
-
-          {tripSummary && (
-            <>
-              <Text style={[styles.summaryRoute, { color: theme.colors.onSurfaceVariant }]}>
-                {tripSummary.routeName}
-              </Text>
-
-              <View style={styles.summaryStats}>
-                <View style={styles.summaryStat}>
-                  <Text style={[styles.summaryStatValue, { color: theme.colors.onSurface }]}>
-                    {Math.floor(tripSummary.duration / 60)}:{(tripSummary.duration % 60).toString().padStart(2, '0')}
-                  </Text>
-                  <Text style={[styles.summaryStatLabel, { color: theme.colors.onSurfaceVariant }]}>Duration</Text>
-                </View>
-
-                <View style={[styles.summaryDivider, { backgroundColor: theme.colors.outlineVariant }]} />
-
-                <View style={styles.summaryStat}>
-                  <Text style={[styles.summaryStatValue, { color: theme.colors.onSurface }]}>
-                    {tripSummary.totalPassengers}
-                  </Text>
-                  <Text style={[styles.summaryStatLabel, { color: theme.colors.onSurfaceVariant }]}>Passengers</Text>
-                </View>
-              </View>
-            </>
-          )}
-
-          <Button mode="contained" onPress={handleNewTrip} style={styles.newTripButton}>
-            Start New Trip
-          </Button>
-        </View>
-      </Modal>
-    </Portal>
-  );
+    return (
+      <IdleState
+        onGoOnline={handleGoOnline}
+        isPressed={isGoOnlinePressed}
+        onPressIn={() => setIsGoOnlinePressed(true)}
+        onPressOut={() => setIsGoOnlinePressed(false)}
+        hasVehicle={!!vehicle}
+        isVehicleLoading={vehicleLoading}
+      />
+    );
+  };
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      {/* map */}
       <MapView
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_DEFAULT}
+        googleRenderer={Platform.OS === 'android' ? 'LEGACY' : undefined}
         initialRegion={currentLocation ? { ...currentLocation, latitudeDelta: 0.01, longitudeDelta: 0.01 } : MANILA_REGION}
         showsUserLocation={false}
         showsMyLocationButton={false}
         mapPadding={mapPadding}
       >
-        {/* current driver marker */}
         {currentLocation && (
           <Marker
             coordinate={{ latitude: currentLocation.latitude, longitude: currentLocation.longitude }}
@@ -552,7 +406,6 @@ export default function DriveScreen() {
           </Marker>
         )}
 
-        {/* other drivers markers */}
         {filteredOtherDrivers.map((driver) => (
           <Marker
             key={driver.id}
@@ -566,10 +419,8 @@ export default function DriveScreen() {
         ))}
       </MapView>
 
-      {/* earnings badge */}
       <EarningsBadge amount={todayEarnings} />
 
-      {/* center on user button */}
       <Pressable
         onPress={handleCenterOnUser}
         style={[styles.centerButton, { backgroundColor: theme.colors.surface, top: insets.top + 12 }]}
@@ -577,7 +428,6 @@ export default function DriveScreen() {
         <MaterialCommunityIcons name="crosshairs-gps" size={24} color={theme.colors.primary} />
       </Pressable>
 
-      {/* connection status */}
       {!isOnline && (
         <View style={[styles.offlineBanner, { top: insets.top + 60, backgroundColor: theme.colors.errorContainer }]}>
           <MaterialCommunityIcons name="wifi-off" size={16} color={theme.colors.error} />
@@ -585,32 +435,31 @@ export default function DriveScreen() {
         </View>
       )}
 
-      {/* bottom sheet */}
-      <BottomSheet
+      <CustomBottomSheet
         ref={bottomSheetRef}
-        index={0}
         snapPoints={snapPoints}
-        backgroundStyle={{ backgroundColor: theme.colors.surface }}
-        handleIndicatorStyle={{ backgroundColor: theme.colors.outlineVariant }}
-        onChange={handleSheetChange}
+        initialIndex={driveState === 'idle' ? 0 : 1}
+        backgroundColor={theme.colors.surface}
+        handleColor={theme.colors.outlineVariant}
+        showHandle={driveState !== 'idle'}
       >
-        {driveState === 'idle' && renderIdleSheet()}
-        {driveState === 'selecting-route' && renderRouteSelectionSheet()}
-        {driveState === 'active' && renderActiveTripSheet()}
-      </BottomSheet>
+        <ScrollView
+          contentContainerStyle={[styles.sheetContent, { paddingBottom: insets.bottom + 16 }]}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={driveState === 'selecting-route'}
+        >
+          {renderSheetContent()}
+        </ScrollView>
+      </CustomBottomSheet>
 
-      {/* trip summary modal */}
-      {renderSummaryModal()}
+      <TripSummaryModal
+        visible={showSummaryModal}
+        tripSummary={tripSummary}
+        onDismiss={handleNewTrip}
+        onNewTrip={handleNewTrip}
+      />
 
-      {/* loading overlay */}
-      {isStartingTrip && (
-        <View style={styles.loadingOverlay}>
-          <View style={[styles.loadingCard, { backgroundColor: theme.colors.surface }]}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={[styles.loadingText, { color: theme.colors.onSurface }]}>Starting trip...</Text>
-          </View>
-        </View>
-      )}
+      <LoadingOverlay visible={isStartingTrip} />
     </GestureHandlerRootView>
   );
 }
@@ -620,8 +469,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   map: {
-    width,
-    height,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   youMarker: {
     width: 44,
@@ -675,132 +527,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sheetContent: {
-    padding: 20,
-  },
-  sheetHeader: {
-    marginBottom: 24,
-  },
-  sheetTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  sheetSubtitle: {
-    fontSize: 14,
-  },
-  goOnlineButton: {
-    paddingVertical: 8,
-    borderRadius: 28,
-  },
-  warningBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 12,
-    borderRadius: 12,
-    marginTop: 16,
-  },
-  warningText: {
-    fontSize: 13,
-    fontWeight: '500',
-    flex: 1,
-  },
-  routeCardsContainer: {
-    paddingBottom: 16,
-    gap: 12,
-  },
-  cancelButton: {
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 16,
-  },
-  cancelButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  passengerSection: {
-    marginTop: 24,
-    marginBottom: 24,
-  },
-  tripActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: 16,
-  },
-  endTripButton: {
-    flex: 1.5,
-  },
-  actionButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  summaryModal: {
-    margin: 20,
-    borderRadius: 24,
-    padding: 32,
-  },
-  summaryContent: {
-    alignItems: 'center',
-  },
-  summaryTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  summaryRoute: {
-    fontSize: 16,
-    marginBottom: 24,
-  },
-  summaryStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  summaryStat: {
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  summaryStatValue: {
-    fontSize: 32,
-    fontWeight: '700',
-  },
-  summaryStatLabel: {
-    fontSize: 13,
-    marginTop: 4,
-  },
-  summaryDivider: {
-    width: 1,
-    height: 48,
-  },
-  newTripButton: {
-    width: '100%',
-    paddingVertical: 8,
-    borderRadius: 28,
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingCard: {
-    padding: 32,
-    borderRadius: 20,
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingTop: 36,
   },
 });
