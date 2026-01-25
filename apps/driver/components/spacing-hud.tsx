@@ -11,7 +11,6 @@ interface SpacingHUDProps {
   compact?: boolean;
 }
 
-// get status label for display
 function getStatusLabel(status: SpacingStatus): string {
   const labels: Record<SpacingStatus, string> = {
     optimal: 'Good Spacing',
@@ -23,7 +22,6 @@ function getStatusLabel(status: SpacingStatus): string {
   return labels[status];
 }
 
-// format time in minutes
 function formatTime(minutes: number | null): string {
   if (minutes === null) return '--';
   if (minutes < 1) return '<1 min';
@@ -83,7 +81,6 @@ export function SpacingHUD({ spacing, isLoading = false, onExpand, compact = fal
 
   return (
     <Surface style={styles.container} elevation={3}>
-      {/* header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
@@ -103,9 +100,7 @@ export function SpacingHUD({ spacing, isLoading = false, onExpand, compact = fal
 
       <Divider style={styles.divider} />
 
-      {/* spacing details */}
       <View style={styles.spacingGrid}>
-        {/* driver ahead */}
         <View style={styles.spacingItem}>
           <Text style={styles.arrowIcon}>▲</Text>
           <Text style={[styles.distanceValue, { color: aheadColor }]}>
@@ -122,7 +117,6 @@ export function SpacingHUD({ spacing, isLoading = false, onExpand, compact = fal
           )}
         </View>
 
-        {/* center status */}
         <View style={styles.centerIndicator}>
           <View style={[styles.statusCircle, { borderColor: statusColor }]}>
             <Text style={styles.youLabel}>YOU</Text>
@@ -132,7 +126,6 @@ export function SpacingHUD({ spacing, isLoading = false, onExpand, compact = fal
           )}
         </View>
 
-        {/* driver behind */}
         <View style={styles.spacingItem}>
           <Text style={styles.arrowIcon}>▼</Text>
           <Text style={[styles.distanceValue, { color: behindColor }]}>
@@ -150,7 +143,6 @@ export function SpacingHUD({ spacing, isLoading = false, onExpand, compact = fal
         </View>
       </View>
 
-      {/* warning message for critical spacing */}
       {(spacing.spacingStatus === 'critical' || spacing.spacingStatus === 'too_close') && (
         <View style={[styles.warningBanner, { backgroundColor: `${statusColor}20` }]}>
           <Text style={[styles.warningText, { color: statusColor }]}>
