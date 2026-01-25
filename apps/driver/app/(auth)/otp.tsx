@@ -22,7 +22,6 @@ export default function OTPVerificationScreen() {
 
   const inputRefs = useRef<(RNTextInput | null)[]>([]);
 
-  // countdown timer for resend
   useEffect(() => {
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
@@ -38,19 +37,16 @@ export default function OTPVerificationScreen() {
     setOtp(newOtp);
     setError(null);
 
-    // auto-focus next input
     if (value && index < OTP_LENGTH - 1) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    // auto-submit when all digits entered
     if (newOtp.every((digit) => digit) && newOtp.join('').length === OTP_LENGTH) {
       handleVerify(newOtp.join(''));
     }
   };
 
   const handleKeyPress = (e: any, index: number) => {
-    // handle backspace to go to previous input
     if (e.nativeEvent.key === 'Backspace' && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
@@ -80,7 +76,6 @@ export default function OTPVerificationScreen() {
         setOtp(Array(OTP_LENGTH).fill(''));
         inputRefs.current[0]?.focus();
       } else {
-        // verification successful - navigate to main or pending approval
         router.replace('/(main)' as any);
       }
     } catch (err) {

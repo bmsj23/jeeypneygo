@@ -17,7 +17,6 @@ export default function PendingApprovalScreen() {
   };
 
   const handleRefresh = () => {
-    // re-initialize auth to check approval status
     const initialize = useAuthStore.getState().initialize;
     initialize();
   };
