@@ -32,7 +32,6 @@ export function useDriverVehicle(driverId: string | undefined): UseDriverVehicle
         .single();
 
       if (queryError) {
-        // no vehicle assigned is not an error, just means driver has no vehicle
         if (queryError.code === 'PGRST116') {
           setVehicle(null);
         } else {
