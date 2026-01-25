@@ -9,7 +9,6 @@ export default function MainLayout() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
-  // ensure minimum padding for ios home indicator
   const bottomPadding = Math.max(insets.bottom, 8);
 
   return (
@@ -71,7 +70,6 @@ export default function MainLayout() {
           ),
         }}
       />
-      {/* hide old screens from tab bar */}
       <Tabs.Screen
         name="trip"
         options={{
@@ -80,12 +78,6 @@ export default function MainLayout() {
       />
       <Tabs.Screen
         name="map"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="history"
         options={{
           href: null,
         }}
