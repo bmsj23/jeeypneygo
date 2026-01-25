@@ -4,6 +4,11 @@ const EARTH_RADIUS_KM = 6371;
 
 const AVERAGE_SPEED_KMH = 15;
 
+const ETA_HYSTERESIS_THRESHOLD = 2;
+const DISTANCE_JITTER_THRESHOLD_M = 50;
+
+const etaCache = new Map<string, { eta: number; distance: number; timestamp: number }>();
+
 function toRadians(degrees: number): number {
   return degrees * (Math.PI / 180);
 }
@@ -31,6 +36,42 @@ export function calculateETA(
   const distanceKm = calculateDistance(jeepneyLocation, stopLocation);
   const timeHours = distanceKm / speedKmh;
   return Math.round(timeHours * 60);
+}
+
+export function calculateStableETA(
+  tripId: string,
+  jeepneyLocation: Coordinates,
+  stopLocation: Coordinates,
+  speedKmh: number = AVERAGE_SPEED_KMH
+): number {
+  const cacheKey = `${tripId}-${stopLocation.latitude.toFixed(6)}-${stopLocation.longitude.toFixed(6)}`;
+  const cached = etaCache.get(cacheKey);
+
+  const distanceKm = calculateDistance(jeepneyLocation, stopLocation);
+  const distanceM = distanceKm * 1000;
+  const newEta = Math.round((distanceKm / speedKmh) * 60);
+
+  if (cached) {
+    const cachedDistanceM = cached.distance * 1000;
+    const distanceChange = Math.abs(distanceM - cachedDistanceM);
+    const etaChange = Math.abs(newEta - cached.eta);
+
+    if (distanceChange < DISTANCE_JITTER_THRESHOLD_M && etaChange < ETA_HYSTERESIS_THRESHOLD) {
+      return cached.eta;
+    }
+
+    if (etaChange < ETA_HYSTERESIS_THRESHOLD) {
+      etaCache.set(cacheKey, { eta: cached.eta, distance: distanceKm, timestamp: Date.now() });
+      return cached.eta;
+    }
+  }
+
+  etaCache.set(cacheKey, { eta: newEta, distance: distanceKm, timestamp: Date.now() });
+  return newEta;
+}
+
+export function clearETACache(): void {
+  etaCache.clear();
 }
 
 export function formatETA(minutes: number): string {
