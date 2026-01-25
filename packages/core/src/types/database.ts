@@ -1,4 +1,3 @@
-// placeholder for supabase generated types
 export type Json =
   | string
   | number

@@ -1,6 +1,5 @@
 import type { Coordinates, ActiveTripWithDetails } from './models';
 
-// spacing thresholds in kilometers
 export interface SpacingThresholds {
   minSpacingKm: number;
   maxSpacingKm: number;
@@ -9,7 +8,6 @@ export interface SpacingThresholds {
   criticalMinKm: number;
 }
 
-// default thresholds for lipa city routes
 export const DEFAULT_SPACING_THRESHOLDS: SpacingThresholds = {
   minSpacingKm: 0.5,
   maxSpacingKm: 3.0,
@@ -18,10 +16,8 @@ export const DEFAULT_SPACING_THRESHOLDS: SpacingThresholds = {
   criticalMinKm: 0.3,
 };
 
-// spacing status between drivers
 export type SpacingStatus = 'optimal' | 'too_close' | 'too_far' | 'isolated' | 'critical';
 
-// driver spacing information
 export interface DriverSpacing {
   tripId: string;
   driverId: string;
@@ -37,7 +33,6 @@ export interface DriverSpacing {
   routeProgressPercent: number | null;
 }
 
-// spacing alert for notifications
 export type AlertSeverity = 'info' | 'warning' | 'critical';
 
 export interface SpacingAlert {
@@ -50,7 +45,6 @@ export interface SpacingAlert {
   distanceKm: number | null;
 }
 
-// route geometry for position calculations
 export interface RouteWaypoint {
   lat: number;
   lng: number;
@@ -63,14 +57,12 @@ export interface RouteGeometry {
   totalLengthKm: number;
 }
 
-// spacing calculation result
 export interface SpacingCalculationResult {
   spacingMap: Map<string, DriverSpacing>;
   alerts: SpacingAlert[];
   routeStats: RouteSpacingStats;
 }
 
-// aggregate stats for a route
 export interface RouteSpacingStats {
   routeId: string;
   activeDriverCount: number;
