@@ -1,9 +1,8 @@
-import React, { memo, useEffect, useRef, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { memo, useEffect, useRef, useState, useCallback } from 'react';
+import { View, StyleSheet, Animated } from 'react-native';
 import { Text } from 'react-native-paper';
-import { Marker, Circle } from 'react-native-maps';
+import { Marker } from 'react-native-maps';
 import { JeepneySvg } from '@jeepneygo/ui';
-import { useCompassHeading } from '@jeepneygo/core';
 
 interface DriverSelfMarkerProps {
   coordinate: { latitude: number; longitude: number };
@@ -13,80 +12,132 @@ interface DriverSelfMarkerProps {
 }
 
 const MARKER_SIZE = 56;
-const HEADING_THRESHOLD = 5;
+const PULSE_SIZE = MARKER_SIZE + 24;
 
 function DriverSelfMarkerComponent({
   coordinate,
   gpsHeading = 0,
-  gpsSpeed = 0,
   routeColor = '#FFB800'
 }: DriverSelfMarkerProps) {
-  const [displayHeading, setDisplayHeading] = useState(gpsHeading);
-  const [pulseRadius, setPulseRadius] = useState(30);
-  const lastHeadingRef = useRef(gpsHeading);
+  const [needsUpdate, setNeedsUpdate] = useState(true);
+  const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevCoordRef = useRef({ lat: coordinate.latitude, lng: coordinate.longitude });
+  const prevHeadingRef = useRef(gpsHeading);
 
-  // use compass heading with gps fallback when moving
-  const { heading: compassHeading } = useCompassHeading({
-    enabled: true,
-    gpsHeading,
-    gpsSpeed,
-    updateIntervalMs: 200,
-  });
+  const pulseScale = useRef(new Animated.Value(1)).current;
+  const pulseOpacity = useRef(new Animated.Value(0.5)).current;
 
-  // update heading only when change exceeds threshold
-  useEffect(() => {
-    const currentHeading = lastHeadingRef.current;
-    let diff = compassHeading - currentHeading;
-
-    // handle wrap-around
-    if (diff > 180) diff -= 360;
-    if (diff < -180) diff += 360;
-
-    if (Math.abs(diff) >= HEADING_THRESHOLD) {
-      setDisplayHeading(compassHeading);
-      lastHeadingRef.current = compassHeading;
+  const scheduleDisable = useCallback(() => {
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
     }
-  }, [compassHeading]);
-
-  // pulse animation using circle radius
-  useEffect(() => {
-    let frame = 0;
-    const animate = () => {
-      frame++;
-      // oscillate between 30 and 50 meters over ~2.4 seconds (144 frames at 60fps)
-      const progress = (Math.sin((frame / 72) * Math.PI) + 1) / 2;
-      setPulseRadius(30 + progress * 20);
-    };
-    const interval = setInterval(animate, 16);
-    return () => clearInterval(interval);
+    setNeedsUpdate(true);
+    updateTimeoutRef.current = setTimeout(() => {
+      setNeedsUpdate(false);
+    }, 500);
   }, []);
 
+  useEffect(() => {
+    scheduleDisable();
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, [scheduleDisable]);
+
+  useEffect(() => {
+    const latChanged = Math.abs(prevCoordRef.current.lat - coordinate.latitude) > 0.00001;
+    const lngChanged = Math.abs(prevCoordRef.current.lng - coordinate.longitude) > 0.00001;
+
+    if (latChanged || lngChanged) {
+      scheduleDisable();
+      prevCoordRef.current = { lat: coordinate.latitude, lng: coordinate.longitude };
+    }
+  }, [coordinate.latitude, coordinate.longitude, scheduleDisable]);
+
+  useEffect(() => {
+    const headingChanged = Math.abs(prevHeadingRef.current - gpsHeading) > 5;
+
+    if (headingChanged) {
+      scheduleDisable();
+      prevHeadingRef.current = gpsHeading;
+    }
+  }, [gpsHeading, scheduleDisable]);
+
+  useEffect(() => {
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(pulseScale, {
+            toValue: 1.6,
+            duration: 1400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseOpacity, {
+            toValue: 0,
+            duration: 1400,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(pulseScale, {
+            toValue: 1,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseOpacity, {
+            toValue: 0.5,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+      ])
+    );
+
+    pulseAnimation.start();
+
+    return () => {
+      pulseAnimation.stop();
+    };
+  }, [pulseScale, pulseOpacity]);
+
+  if (!coordinate || !coordinate.latitude || !coordinate.longitude) {
+    return null;
+  }
+
   return (
-    <>
-      <Circle
-        center={coordinate}
-        radius={pulseRadius}
-        fillColor={`${routeColor}30`}
-        strokeColor={`${routeColor}50`}
-        strokeWidth={2}
-      />
-      <Marker
-        coordinate={coordinate}
-        anchor={{ x: 0.5, y: 0.5 }}
-        flat={true}
-        rotation={displayHeading}
-        tracksViewChanges={false}
-      >
-        <View style={styles.container}>
-          <View style={styles.markerWrapper}>
-            <JeepneySvg size={MARKER_SIZE} color={routeColor} />
-          </View>
-          <View style={[styles.youBadge, { backgroundColor: routeColor }]}>
-            <Text style={styles.youText}>YOU</Text>
-          </View>
+    <Marker
+      coordinate={coordinate}
+      anchor={{ x: 0.5, y: 0.5 }}
+      rotation={gpsHeading}
+      tracksViewChanges={needsUpdate}
+      flat
+      zIndex={999}
+    >
+      <View style={styles.container}>
+        {/* pulse/radar ring with fill */}
+        <Animated.View
+          style={[
+            styles.pulseRing,
+            {
+              backgroundColor: `${routeColor}25`,
+              borderColor: routeColor,
+              transform: [{ scale: pulseScale }],
+              opacity: pulseOpacity,
+            },
+          ]}
+        />
+        {/* jeepney icon */}
+        <View style={styles.markerWrapper}>
+          <JeepneySvg size={MARKER_SIZE} color={routeColor} />
         </View>
-      </Marker>
-    </>
+        {/* you badge */}
+        <View style={[styles.youBadge, { backgroundColor: routeColor }]}>
+          <Text style={styles.youText}>YOU</Text>
+        </View>
+      </View>
+    </Marker>
   );
 }
 
@@ -94,8 +145,15 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: MARKER_SIZE + 20,
-    height: MARKER_SIZE + 30,
+    width: MARKER_SIZE + 50,
+    height: MARKER_SIZE + 60,
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: PULSE_SIZE,
+    height: PULSE_SIZE,
+    borderRadius: PULSE_SIZE / 2,
+    borderWidth: 2.5,
   },
   markerWrapper: {
     width: MARKER_SIZE,
@@ -128,4 +186,23 @@ const styles = StyleSheet.create({
   },
 });
 
-export const DriverSelfMarker = memo(DriverSelfMarkerComponent);
+function arePropsEqual(
+  prevProps: DriverSelfMarkerProps,
+  nextProps: DriverSelfMarkerProps
+): boolean {
+  // re-render if position changes significantly
+  const latDiff = Math.abs(prevProps.coordinate.latitude - nextProps.coordinate.latitude);
+  const lngDiff = Math.abs(prevProps.coordinate.longitude - nextProps.coordinate.longitude);
+  if (latDiff > 0.00001 || lngDiff > 0.00001) return false;
+
+  // re-render if gps heading changes by more than 5 degrees
+  const headingDiff = Math.abs((prevProps.gpsHeading || 0) - (nextProps.gpsHeading || 0));
+  if (headingDiff > 5) return false;
+
+  // re-render if route color changes
+  if (prevProps.routeColor !== nextProps.routeColor) return false;
+
+  return true;
+}
+
+export const DriverSelfMarker = memo(DriverSelfMarkerComponent, arePropsEqual);
