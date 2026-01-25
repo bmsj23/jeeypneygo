@@ -15,15 +15,15 @@ export { StatusBadge } from './components/status-badge';
 export { Skeleton, SkeletonCard, SkeletonList } from './components/skeleton';
 export { EmptyState } from './components/empty-state';
 
-// driver-specific components
 export { EarningsBadge } from './components/earnings-badge';
 export { PassengerStepper } from './components/passenger-stepper';
 export { RouteCard } from './components/route-card';
 export { OnlineToggle } from './components/online-toggle';
 export { StatCard } from './components/stat-card';
 export { TripTimer } from './components/trip-timer';
+export { FareLogger, FareLoggerCompact } from './components/fare-logger';
+export type { FareEntry, FareLoggerProps } from './components/fare-logger';
 
-// commuter-specific components
 export { JeepneyETACard } from './components/jeepney-eta-card';
 export { StopCard } from './components/stop-card';
 export { SearchBar, SearchBarHero } from './components/search-bar';
