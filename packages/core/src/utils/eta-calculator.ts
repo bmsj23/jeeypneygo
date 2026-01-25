@@ -2,15 +2,12 @@ import type { Coordinates } from '../types/models';
 
 const EARTH_RADIUS_KM = 6371;
 
-// average jeepney speed in km/h (city traffic conditions)
 const AVERAGE_SPEED_KMH = 15;
 
-// convert degrees to radians
 function toRadians(degrees: number): number {
   return degrees * (Math.PI / 180);
 }
 
-// calculate distance between two coordinates using haversine formula
 export function calculateDistance(from: Coordinates, to: Coordinates): number {
   const dLat = toRadians(to.latitude - from.latitude);
   const dLon = toRadians(to.longitude - from.longitude);
@@ -26,7 +23,6 @@ export function calculateDistance(from: Coordinates, to: Coordinates): number {
   return EARTH_RADIUS_KM * c;
 }
 
-// calculate ETA in minutes based on distance
 export function calculateETA(
   jeepneyLocation: Coordinates,
   stopLocation: Coordinates,
@@ -37,7 +33,6 @@ export function calculateETA(
   return Math.round(timeHours * 60);
 }
 
-// format ETA for display
 export function formatETA(minutes: number): string {
   if (minutes < 1) {
     return 'Arriving';
@@ -56,7 +51,6 @@ export function formatETA(minutes: number): string {
   return `${hours} hr ${remainingMins} min`;
 }
 
-// get time ago string from timestamp
 export function getTimeAgo(timestamp: string | Date): string {
   const now = new Date();
   const then = new Date(timestamp);
@@ -77,7 +71,6 @@ export function getTimeAgo(timestamp: string | Date): string {
   return `${diffHours}h ago`;
 }
 
-// check if location data is stale (older than threshold)
 export function isLocationStale(
   timestamp: string | Date,
   thresholdSeconds: number = 60
