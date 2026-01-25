@@ -37,6 +37,32 @@ export const useAuthStore = create<AuthStore>()(
 
       initialize: async () => {
         try {
+          supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && session?.user) {
+              const { data: profile } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+
+              set({
+                user: profile,
+                session: {
+                  access_token: session.access_token,
+                  refresh_token: session.refresh_token,
+                },
+                isAuthenticated: true,
+                isLoading: false,
+              });
+            } else if (event === 'SIGNED_OUT') {
+              set({
+                user: null,
+                session: null,
+                isAuthenticated: false,
+              });
+            }
+          });
+
           const { data: { session } } = await supabase.auth.getSession();
 
           if (session?.user) {
@@ -150,6 +176,35 @@ export const useAuthStore = create<AuthStore>()(
 
           if (error) return { error: new Error(error.message) };
 
+          if (data.session?.user) {
+            const { data: existingProfile } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', data.session.user.id)
+              .single();
+
+            const userProfile = existingProfile || {
+              id: data.session.user.id,
+              phone: null,
+              email: data.session.user.email || null,
+              display_name: displayName,
+              role: 'commuter' as const,
+              is_approved: true,
+              avatar_url: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+
+            set({
+              user: userProfile,
+              session: {
+                access_token: data.session.access_token,
+                refresh_token: data.session.refresh_token,
+              },
+              isAuthenticated: true,
+            });
+          }
+
           return { error: null };
         } catch (error) {
           return { error: error as Error };
@@ -204,6 +259,8 @@ export const useAuthStore = create<AuthStore>()(
       storage: createJSONStorage(() => secureStorage),
       partialize: (state) => ({
         session: state.session,
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
       }),
     }
   )
