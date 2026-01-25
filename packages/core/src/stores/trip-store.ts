@@ -21,7 +21,7 @@ const DISCOUNTED_FARE = 10;
 
 export interface FareEntry {
   id: string;
-  type: 'regular' | 'discounted';
+  type: 'regular' | 'discounted' | 'custom';
   amount: number;
   timestamp: number;
 }
@@ -38,6 +38,8 @@ interface TripState {
   totalFare: number;
   regularPassengers: number;
   discountedPassengers: number;
+  // current passengers physically onboard (can be decremented when they alight)
+  currentPassengersOnboard: number;
 }
 
 interface TripActions {
@@ -52,8 +54,10 @@ interface TripActions {
   clearError: () => void;
   reset: () => void;
   logFare: (type: 'regular' | 'discounted') => void;
+  logCustomFare: (amount: number) => void;
   undoLastFare: () => void;
   clearFares: () => void;
+  decrementPassenger: () => void;
 }
 
 interface StartTripParams {
@@ -90,6 +94,7 @@ const initialState: TripState = {
   totalFare: 0,
   regularPassengers: 0,
   discountedPassengers: 0,
+  currentPassengersOnboard: 0,
 };
 
 export const useTripStore = create<TripStore>()(
@@ -115,32 +120,56 @@ export const useTripStore = create<TripStore>()(
           totalFare: state.totalFare + amount,
           regularPassengers: state.regularPassengers + (type === 'regular' ? 1 : 0),
           discountedPassengers: state.discountedPassengers + (type === 'discounted' ? 1 : 0),
+          currentPassengersOnboard: state.currentPassengersOnboard + 1,
         }));
 
-        const { activeTrip, regularPassengers, discountedPassengers } = get();
+        const { activeTrip, currentPassengersOnboard } = get();
         if (activeTrip) {
-          const newCount = regularPassengers + discountedPassengers + 1;
-          get().updatePassengerCount(newCount);
+          get().updatePassengerCount(currentPassengersOnboard);
+        }
+      },
+
+      logCustomFare: (amount) => {
+        const entry: FareEntry = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          type: 'custom',
+          amount,
+          timestamp: Date.now(),
+        };
+
+        set((state) => ({
+          fareEntries: [...state.fareEntries, entry],
+          totalFare: state.totalFare + amount,
+          regularPassengers: state.regularPassengers + 1,
+          currentPassengersOnboard: state.currentPassengersOnboard + 1,
+        }));
+
+        const { activeTrip, currentPassengersOnboard } = get();
+        if (activeTrip) {
+          get().updatePassengerCount(currentPassengersOnboard);
         }
       },
 
       undoLastFare: () => {
-        const { fareEntries } = get();
+        const { fareEntries, currentPassengersOnboard } = get();
         if (fareEntries.length === 0) return;
 
         const lastEntry = fareEntries[fareEntries.length - 1];
+        const wasRegular = lastEntry.type === 'regular' || lastEntry.type === 'custom';
 
         set((state) => ({
           fareEntries: state.fareEntries.slice(0, -1),
           totalFare: state.totalFare - lastEntry.amount,
-          regularPassengers: state.regularPassengers - (lastEntry.type === 'regular' ? 1 : 0),
+          regularPassengers: state.regularPassengers - (wasRegular ? 1 : 0),
           discountedPassengers: state.discountedPassengers - (lastEntry.type === 'discounted' ? 1 : 0),
+          // undo means passenger didnt actually board, so decrement both stats and onboard
+          currentPassengersOnboard: Math.max(0, state.currentPassengersOnboard - 1),
         }));
 
-        const { activeTrip, regularPassengers, discountedPassengers } = get();
+        const newOnboard = Math.max(0, currentPassengersOnboard - 1);
+        const { activeTrip } = get();
         if (activeTrip) {
-          const newCount = regularPassengers + discountedPassengers - 1;
-          get().updatePassengerCount(Math.max(0, newCount));
+          get().updatePassengerCount(newOnboard);
         }
       },
 
@@ -150,7 +179,26 @@ export const useTripStore = create<TripStore>()(
           totalFare: 0,
           regularPassengers: 0,
           discountedPassengers: 0,
+          currentPassengersOnboard: 0,
         });
+      },
+
+      decrementPassenger: () => {
+        const { activeTrip, currentPassengersOnboard } = get();
+
+        // prevent negative passenger count
+        if (currentPassengersOnboard <= 0) return;
+
+        // only decrement currentPassengersOnboard (passengers alighting)
+        // does NOT affect regularPassengers/discountedPassengers (total served for stats)
+        // does NOT affect totalFare (they already paid)
+        const newOnboard = currentPassengersOnboard - 1;
+        set({ currentPassengersOnboard: newOnboard });
+
+        // update the database passenger count
+        if (activeTrip) {
+          get().updatePassengerCount(newOnboard);
+        }
       },
 
       startTrip: async ({ driverId, vehicleId, routeId, latitude, longitude }) => {
@@ -162,6 +210,7 @@ export const useTripStore = create<TripStore>()(
             totalFare: 0,
             regularPassengers: 0,
             discountedPassengers: 0,
+            currentPassengersOnboard: 0,
           });
 
           const tripData = {
@@ -419,6 +468,7 @@ export const useTripStore = create<TripStore>()(
         totalFare: state.totalFare,
         regularPassengers: state.regularPassengers,
         discountedPassengers: state.discountedPassengers,
+        currentPassengersOnboard: state.currentPassengersOnboard,
       }),
     }
   )
