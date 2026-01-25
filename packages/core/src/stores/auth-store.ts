@@ -39,14 +39,28 @@ export const useAuthStore = create<AuthStore>()(
         try {
           supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && session?.user) {
-              const { data: profile } = await supabase
+              const { data: profile, error: profileError } = await supabase
                 .from('users')
                 .select('*')
                 .eq('id', session.user.id)
                 .single();
 
+              if (profileError) {
+                console.error('Error fetching user profile:', profileError);
+              }
+
               set({
-                user: profile,
+                user: profile || {
+                  id: session.user.id,
+                  email: session.user.email ?? null,
+                  phone: session.user.phone ?? null,
+                  display_name: session.user.email?.split('@')[0] || 'User',
+                  role: 'commuter',
+                  is_approved: false,
+                  avatar_url: null,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                },
                 session: {
                   access_token: session.access_token,
                   refresh_token: session.refresh_token,
@@ -66,14 +80,28 @@ export const useAuthStore = create<AuthStore>()(
           const { data: { session } } = await supabase.auth.getSession();
 
           if (session?.user) {
-            const { data: profile } = await supabase
+            const { data: profile, error: profileError } = await supabase
               .from('users')
               .select('*')
               .eq('id', session.user.id)
               .single();
 
+            if (profileError) {
+              console.error('Error fetching user profile on init:', profileError);
+            }
+
             set({
-              user: profile,
+              user: profile || {
+                id: session.user.id,
+                email: session.user.email ?? null,
+                phone: session.user.phone ?? null,
+                display_name: session.user.email?.split('@')[0] || 'User',
+                role: 'commuter',
+                is_approved: false,
+                avatar_url: null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              },
               session: {
                 access_token: session.access_token,
                 refresh_token: session.refresh_token,
@@ -82,7 +110,24 @@ export const useAuthStore = create<AuthStore>()(
               isLoading: false,
             });
           } else {
-            set({ isLoading: false });
+            const currentState = get();
+            if (currentState.session) {
+              const { data: { session: restoredSession } } = await supabase.auth.setSession({
+                access_token: currentState.session.access_token,
+                refresh_token: currentState.session.refresh_token,
+              });
+
+              if (!restoredSession) {
+                set({
+                  user: null,
+                  session: null,
+                  isAuthenticated: false,
+                  isLoading: false,
+                });
+              }
+            } else {
+              set({ isLoading: false });
+            }
           }
         } catch (error) {
           console.error('Auth initialization error:', error);
@@ -110,14 +155,28 @@ export const useAuthStore = create<AuthStore>()(
           if (error) return { error: new Error(error.message) };
 
           if (data.session?.user) {
-            const { data: profile } = await supabase
+            const { data: profile, error: profileError } = await supabase
               .from('users')
               .select('*')
               .eq('id', data.session.user.id)
               .single();
 
+            if (profileError) {
+              console.warn('Profile not found after OTP, using fallback:', profileError.message);
+            }
+
             set({
-              user: profile,
+              user: profile || {
+                id: data.session.user.id,
+                email: data.session.user.email ?? null,
+                phone: data.session.user.phone || phone,
+                display_name: data.session.user.phone || 'User',
+                role: 'commuter',
+                is_approved: true,
+                avatar_url: null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              },
               session: {
                 access_token: data.session.access_token,
                 refresh_token: data.session.refresh_token,
@@ -142,14 +201,28 @@ export const useAuthStore = create<AuthStore>()(
           if (error) return { error: new Error(error.message) };
 
           if (data.session?.user) {
-            const { data: profile } = await supabase
+            const { data: profile, error: profileError } = await supabase
               .from('users')
               .select('*')
               .eq('id', data.session.user.id)
               .single();
 
+            if (profileError) {
+              console.warn('Profile not found, using fallback:', profileError.message);
+            }
+
             set({
-              user: profile,
+              user: profile || {
+                id: data.session.user.id,
+                email: data.session.user.email ?? null,
+                phone: data.session.user.phone ?? null,
+                display_name: data.session.user.email?.split('@')[0] || 'User',
+                role: 'commuter',
+                is_approved: true,
+                avatar_url: null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              },
               session: {
                 access_token: data.session.access_token,
                 refresh_token: data.session.refresh_token,
@@ -229,15 +302,20 @@ export const useAuthStore = create<AuthStore>()(
             return { error: new Error('No user logged in') };
           }
 
+          const updateData: Record<string, string | null | undefined> = {};
+          if (updates.display_name !== undefined) updateData.display_name = updates.display_name;
+          if (updates.phone !== undefined) updateData.phone = updates.phone;
+          if (updates.email !== undefined) updateData.email = updates.email;
+          if (updates.avatar_url !== undefined) updateData.avatar_url = updates.avatar_url;
+
+          if (Object.keys(updateData).length === 0) {
+            return { error: null };
+          }
+
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { data, error } = await (supabase as any)
             .from('users')
-            .update({
-              display_name: updates.display_name,
-              phone: updates.phone,
-              email: updates.email,
-              avatar_url: updates.avatar_url,
-            })
+            .update(updateData)
             .eq('id', currentUser.id)
             .select()
             .single();
