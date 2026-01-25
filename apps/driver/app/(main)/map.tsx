@@ -21,7 +21,6 @@ import { RouteSpacingOverlay } from '../../../commuter/components/route-spacing-
 
 const { width, height } = Dimensions.get('window');
 
-// lipa city default region
 const LIPA_REGION: Region = {
   latitude: 13.9411,
   longitude: 121.1625,
@@ -46,18 +45,15 @@ export default function DriverMapScreen() {
   const [showSpacingAlert, setShowSpacingAlert] = useState(false);
   const [spacingAlertMessage, setSpacingAlertMessage] = useState('');
 
-  // get all trips on the same route (if active trip exists)
   const routeId = activeTrip?.route_id || selectedRoute?.id;
   const { trips: allTrips, connectionState } = useActiveTrips({
     routeId: routeId || undefined,
   });
 
-  // filter out duplicate trips for current driver (keep only one trip per driver)
   const trips = useMemo(() => {
     const driverTripMap = new Map<string, typeof allTrips[0]>();
     allTrips.forEach((trip) => {
       const existingTrip = driverTripMap.get(trip.driver_id);
-      // keep the most recent trip for each driver based on last_updated
       if (!existingTrip ||
           (trip.last_updated && existingTrip.last_updated &&
            new Date(trip.last_updated) > new Date(existingTrip.last_updated))) {
@@ -69,20 +65,17 @@ export default function DriverMapScreen() {
     return Array.from(driverTripMap.values());
   }, [allTrips]);
 
-  // get the route data for polyline
   const currentRoute = useMemo(() => {
     if (!routeId) return null;
     return routes.find((r) => r.id === routeId) || selectedRoute || null;
   }, [routeId, routes, selectedRoute]);
 
-  // calculate driver spacing
   const { currentDriverSpacing, spacingMap, newAlerts, clearNewAlerts, routeStats } =
     useDriverSpacing(trips, routeId || '', currentRoute, {
       currentTripId: activeTrip?.id,
       enableAlerts: true,
     });
 
-  // show connection error snackbar only for real disconnections
   useEffect(() => {
     if (connectionState === 'error' || connectionState === 'disconnected') {
       if (lastConnectionState === 'connected') {
@@ -99,7 +92,6 @@ export default function DriverMapScreen() {
     setLastConnectionState(connectionState);
   }, [connectionState, hadRealDisconnection, lastConnectionState]);
 
-  // handle new spacing alerts
   useEffect(() => {
     if (newAlerts.length > 0) {
       const criticalAlert = newAlerts.find((a) => a.severity === 'critical');
@@ -117,7 +109,6 @@ export default function DriverMapScreen() {
     }
   }, [newAlerts, clearNewAlerts]);
 
-  // center map on user when location available
   useEffect(() => {
     if (userLocation && mapRef.current) {
       mapRef.current.animateToRegion({
@@ -139,7 +130,6 @@ export default function DriverMapScreen() {
     }
   }, [userLocation, refreshLocation]);
 
-  // check if a trip belongs to current driver
   const isCurrentDriver = useCallback(
     (trip: ActiveTripWithDetails) => {
       return trip.driver_id === user?.id;
@@ -147,14 +137,12 @@ export default function DriverMapScreen() {
     [user?.id]
   );
 
-  // render marker with differentiation for current driver
   const renderMarker = useCallback(
     (trip: ActiveTripWithDetails) => {
       const isSelf = isCurrentDriver(trip);
       const stale = trip.last_updated ? isLocationStale(trip.last_updated) : false;
 
       if (isSelf) {
-        // render current driver's marker differently
         return (
           <Marker
             key={trip.id}
@@ -176,7 +164,6 @@ export default function DriverMapScreen() {
         );
       }
 
-      // render other drivers using standard marker
       return (
         <JeepneyMarker
           key={trip.id}
@@ -189,7 +176,6 @@ export default function DriverMapScreen() {
     [isCurrentDriver, theme.colors.primary]
   );
 
-  // no active trip view
   if (!activeTrip && !selectedRoute) {
     return (
       <ScreenContainer>
@@ -207,7 +193,6 @@ export default function DriverMapScreen() {
 
   return (
     <View style={styles.container}>
-      {/* map */}
       <ClusteredMapView
         ref={mapRef}
         style={styles.map}
@@ -224,7 +209,6 @@ export default function DriverMapScreen() {
         minPoints={3}
         maxZoom={16}
       >
-        {/* route overlay */}
         {currentRoute && (
           <RouteSpacingOverlay
             route={currentRoute}
