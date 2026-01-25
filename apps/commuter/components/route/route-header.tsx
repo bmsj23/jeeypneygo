@@ -28,7 +28,6 @@ export function RouteHeader({
 }: RouteHeaderProps) {
   const theme = useTheme();
 
-  // loading state
   if (isLoading && !route) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -39,7 +38,6 @@ export function RouteHeader({
     );
   }
 
-  // not found state
   if (!route) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -126,6 +124,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingBottom: 50,
+    zIndex: 1,
   },
   headerTop: {
     flexDirection: 'row',
@@ -186,6 +185,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 6,
+    zIndex: 10,
   },
   statItem: {
     flex: 1,
