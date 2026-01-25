@@ -3,7 +3,7 @@ import { View, StyleSheet, Dimensions, ScrollView, Alert, Pressable, Platform } 
 import { Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import MapView, { Marker, PROVIDER_DEFAULT, Region } from 'react-native-maps';
+import MapView, { PROVIDER_DEFAULT, Region } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { EarningsBadge } from '@jeepneygo/ui';
 import {
@@ -14,6 +14,7 @@ import {
   useLocationTracking,
   useNetworkStatus,
   useActiveTrips,
+  isLocationStale,
   type Route,
   type TripSummary,
 } from '@jeepneygo/core';
@@ -25,6 +26,8 @@ import {
   TripSummaryModal,
   LoadingOverlay,
 } from '../../components/drive';
+import { DriverSelfMarker } from '../../components/drive/driver-self-marker';
+import { JeepneyMarker } from '../../../commuter/components/jeepney-marker';
 
 const { height } = Dimensions.get('window');
 
@@ -396,27 +399,25 @@ export default function DriveScreen() {
         mapPadding={mapPadding}
       >
         {currentLocation && (
-          <Marker
+          <DriverSelfMarker
             coordinate={{ latitude: currentLocation.latitude, longitude: currentLocation.longitude }}
-            anchor={{ x: 0.5, y: 0.5 }}
-          >
-            <View style={[styles.youMarker, { backgroundColor: theme.colors.primary }]}>
-              <MaterialCommunityIcons name="navigation" size={20} color="#000000" />
-            </View>
-          </Marker>
+            gpsHeading={currentLocation.heading || 0}
+            gpsSpeed={currentLocation.speed || 0}
+            routeColor={currentRoute?.color || theme.colors.primary}
+          />
         )}
 
-        {filteredOtherDrivers.map((driver) => (
-          <Marker
-            key={driver.id}
-            coordinate={{ latitude: driver.current_latitude, longitude: driver.current_longitude }}
-            anchor={{ x: 0.5, y: 0.5 }}
-          >
-            <View style={[styles.otherDriverMarker, { backgroundColor: currentRoute?.color || theme.colors.primary }]}>
-              <MaterialCommunityIcons name="bus" size={16} color="#FFFFFF" />
-            </View>
-          </Marker>
-        ))}
+        {filteredOtherDrivers.map((driver) => {
+          const stale = driver.last_updated ? isLocationStale(driver.last_updated) : false;
+          return (
+            <JeepneyMarker
+              key={driver.id}
+              trip={driver}
+              isStale={stale}
+              onPress={() => {}}
+            />
+          );
+        })}
       </MapView>
 
       <EarningsBadge amount={todayEarnings} />
@@ -444,7 +445,11 @@ export default function DriveScreen() {
         showHandle={driveState !== 'idle'}
       >
         <ScrollView
-          contentContainerStyle={[styles.sheetContent, { paddingBottom: insets.bottom + 16 }]}
+          contentContainerStyle={[
+            styles.sheetContent,
+            driveState === 'active' && styles.activeSheetContent,
+            { paddingBottom: insets.bottom + 24 }
+          ]}
           showsVerticalScrollIndicator={false}
           scrollEnabled={driveState === 'selecting-route'}
         >
@@ -474,29 +479,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-  },
-  youMarker: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  otherDriverMarker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
   },
   centerButton: {
     position: 'absolute',
@@ -528,6 +510,9 @@ const styles = StyleSheet.create({
   },
   sheetContent: {
     paddingHorizontal: 20,
-    paddingTop: 36,
+    paddingTop: 24,
+  },
+  activeSheetContent: {
+    paddingTop: 12,
   },
 });
