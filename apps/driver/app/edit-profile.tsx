@@ -53,20 +53,34 @@ export default function EditProfileScreen() {
     try {
       let finalAvatarUrl = avatarUri;
 
-      // upload avatar to supabase storage if it's a local file
-      if (avatarUri && (avatarUri.startsWith('file://') || avatarUri.startsWith('ph://')) && user?.id) {
-        const base64 = await FileSystem.readAsStringAsync(avatarUri, {
-          encoding: 'base64',
-        });
-        const extension = avatarUri.split('.').pop()?.toLowerCase() || 'jpg';
-        
-        const { url, error: uploadError } = await uploadAvatarFromBase64(user.id, base64, extension);
-        if (uploadError) {
-          Alert.alert('Error', 'Failed to upload profile picture. Please try again.');
+      if (avatarUri && !avatarUri.startsWith('http') && user?.id) {
+        try {
+          const base64 = await FileSystem.readAsStringAsync(avatarUri, {
+            encoding: 'base64',
+          });
+
+          const uriParts = avatarUri.split('.');
+          const extension = uriParts.length > 1 ? uriParts.pop()?.toLowerCase() : 'jpg';
+
+          const { url, error: uploadError } = await uploadAvatarFromBase64(
+            user.id,
+            base64,
+            extension || 'jpg'
+          );
+
+          if (uploadError) {
+            console.error('Avatar upload failed:', uploadError.message);
+            Alert.alert('Upload Error', uploadError.message || 'Failed to upload profile picture.');
+            setIsSubmitting(false);
+            return;
+          }
+          finalAvatarUrl = url;
+        } catch (readError) {
+          console.error('Failed to read image file:', readError);
+          Alert.alert('Error', 'Failed to read the selected image. Please try again.');
           setIsSubmitting(false);
           return;
         }
-        finalAvatarUrl = url;
       }
 
       const updateProfile = useAuthStore.getState().updateProfile;
@@ -86,6 +100,7 @@ export default function EditProfileScreen() {
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (error) {
+      console.error('Profile update error:', error);
       Alert.alert('Error', 'Failed to update profile. Please try again.');
     } finally {
       setIsSubmitting(false);
