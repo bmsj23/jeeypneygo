@@ -7,7 +7,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useAuthStore } from '@jeepneygo/core';
+import * as FileSystem from 'expo-file-system/legacy';
+import { useAuthStore, uploadAvatarFromBase64 } from '@jeepneygo/core';
 import {
   AvatarSection,
   ProfileForm,
@@ -29,7 +30,10 @@ export default function EditProfileScreen() {
   const user = useAuthStore((state) => state.user);
 
   const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatar_url || null);
+  const [originalAvatarUri] = useState<string | null>(user?.avatar_url || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const avatarChanged = avatarUri !== originalAvatarUri;
 
   const {
     control,
@@ -47,12 +51,44 @@ export default function EditProfileScreen() {
   const onSubmit = async (data: ProfileFormData) => {
     setIsSubmitting(true);
     try {
+      let finalAvatarUrl = avatarUri;
+
+      if (avatarUri && !avatarUri.startsWith('http') && user?.id) {
+        try {
+          const base64 = await FileSystem.readAsStringAsync(avatarUri, {
+            encoding: 'base64',
+          });
+
+          const uriParts = avatarUri.split('.');
+          const extension = uriParts.length > 1 ? uriParts.pop()?.toLowerCase() : 'jpg';
+
+          const { url, error: uploadError } = await uploadAvatarFromBase64(
+            user.id,
+            base64,
+            extension || 'jpg'
+          );
+
+          if (uploadError) {
+            console.error('Avatar upload failed:', uploadError.message);
+            Alert.alert('Upload Error', uploadError.message || 'Failed to upload profile picture.');
+            setIsSubmitting(false);
+            return;
+          }
+          finalAvatarUrl = url;
+        } catch (readError) {
+          console.error('Failed to read image file:', readError);
+          Alert.alert('Error', 'Failed to read the selected image. Please try again.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const updateProfile = useAuthStore.getState().updateProfile;
       const { error } = await updateProfile({
         display_name: data.displayName,
         phone: data.phone || undefined,
         email: data.email || undefined,
-        avatar_url: avatarUri || undefined,
+        avatar_url: finalAvatarUrl || undefined,
       });
 
       if (error) {
@@ -64,6 +100,7 @@ export default function EditProfileScreen() {
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (error) {
+      console.error('Profile update error:', error);
       Alert.alert('Error', 'Failed to update profile. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -102,7 +139,7 @@ export default function EditProfileScreen() {
         <SaveButton
           onPress={handleSubmit(onSubmit)}
           isSubmitting={isSubmitting}
-          isDisabled={!isDirty && !avatarUri}
+          isDisabled={!isDirty && !avatarChanged}
         />
         <View style={{ height: insets.bottom }} />
       </ScrollView>
