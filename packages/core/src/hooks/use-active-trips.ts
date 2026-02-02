@@ -116,8 +116,18 @@ export function useActiveTrips(options: UseActiveTripsOptions | string = {}): Us
   const handleUpdate = useCallback((payload: RealtimePostgresChangesPayload<ActiveTrip>) => {
     const updatedTrip = payload.new as ActiveTrip;
 
-    setTrips((prev) =>
-      prev.map((trip) => {
+    if (updatedTrip.status !== 'active') {
+      setTrips((prev) => prev.filter((trip) => trip.id !== updatedTrip.id));
+      return;
+    }
+
+    setTrips((prev) => {
+      const exists = prev.some((trip) => trip.id === updatedTrip.id);
+      if (!exists) {
+        return prev;
+      }
+
+      return prev.map((trip) => {
         if (trip.id !== updatedTrip.id) return trip;
 
         return {
@@ -127,8 +137,8 @@ export function useActiveTrips(options: UseActiveTripsOptions | string = {}): Us
           driver: relationsCache.drivers.get(updatedTrip.driver_id) || trip.driver,
           route: relationsCache.routes.get(updatedTrip.route_id) || trip.route,
         };
-      })
-    );
+      });
+    });
   }, []);
 
   const handleDelete = useCallback((payload: RealtimePostgresChangesPayload<ActiveTrip>) => {
@@ -223,11 +233,13 @@ export function useActiveTrips(options: UseActiveTripsOptions | string = {}): Us
     }, delay);
   }, [subscribe, fetchTrips]);
 
+  const routeIdRef = useRef(routeId);
+  const prevConnectionStateRef = useRef<ConnectionState>('connecting');
+
   useEffect(() => {
     isMountedRef.current = true;
 
     fetchTrips();
-
     subscribe();
 
     const syncIntervalId = setInterval(() => {
@@ -248,6 +260,24 @@ export function useActiveTrips(options: UseActiveTripsOptions | string = {}): Us
       clearInterval(syncIntervalId);
     };
   }, [fetchTrips, subscribe, syncInterval]);
+
+  useEffect(() => {
+    if (routeIdRef.current !== routeId) {
+      routeIdRef.current = routeId;
+      setTrips([]);
+      setIsLoading(true);
+      setConnectionState('connecting');
+      fetchTrips();
+      subscribe();
+    }
+  }, [routeId, fetchTrips, subscribe]);
+
+  useEffect(() => {
+    if (prevConnectionStateRef.current === 'error' && connectionState === 'connected') {
+      fetchTrips();
+    }
+    prevConnectionStateRef.current = connectionState;
+  }, [connectionState, fetchTrips]);
 
   return { trips, isLoading, error, connectionState, refetch: fetchTrips };
 }
