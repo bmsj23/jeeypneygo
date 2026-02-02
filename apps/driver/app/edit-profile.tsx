@@ -139,7 +139,7 @@ export default function EditProfileScreen() {
         <SaveButton
           onPress={handleSubmit(onSubmit)}
           isSubmitting={isSubmitting}
-          isDisabled={!isDirty && !avatarUri}
+          isDisabled={!isDirty && !avatarChanged}
         />
         <View style={{ height: insets.bottom }} />
       </ScrollView>
