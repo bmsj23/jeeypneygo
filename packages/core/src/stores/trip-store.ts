@@ -51,6 +51,8 @@ interface TripActions {
   pauseTrip: () => Promise<{ success: boolean; error?: Error }>;
   resumeTrip: () => Promise<{ success: boolean; error?: Error }>;
   endTrip: () => Promise<{ success: boolean; tripSummary?: TripSummary; error?: Error }>;
+  fetchMyActiveTrip: (driverId: string) => Promise<{ success: boolean; error?: Error }>;
+  clearForLogout: () => Promise<void>;
   clearError: () => void;
   reset: () => void;
   logFare: (type: 'regular' | 'discounted') => void;
@@ -265,7 +267,8 @@ export const useTripStore = create<TripStore>()(
           const { error } = await (supabase as any)
             .from('active_trips')
             .update(updateData)
-            .eq('id', activeTrip.id);
+            .eq('id', activeTrip.id)
+            .eq('driver_id', activeTrip.driver_id);
 
           if (error) {
             throw new Error(error.message);
@@ -296,13 +299,18 @@ export const useTripStore = create<TripStore>()(
             last_updated: new Date().toISOString(),
           };
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { error } = await (supabase as any)
+          const { error, count } = await (supabase as any)
             .from('active_trips')
             .update(updateData)
-            .eq('id', activeTrip.id);
+            .eq('id', activeTrip.id)
+            .eq('driver_id', activeTrip.driver_id);
 
           if (error) {
             throw new Error(error.message);
+          }
+
+          if (count === 0) {
+            return { success: false, error: new Error('Trip not found or driver mismatch') };
           }
 
           set({
@@ -333,7 +341,8 @@ export const useTripStore = create<TripStore>()(
           const { error } = await (supabase as any)
             .from('active_trips')
             .update(updateData)
-            .eq('id', activeTrip.id);
+            .eq('id', activeTrip.id)
+            .eq('driver_id', activeTrip.driver_id);
 
           if (error) {
             throw new Error(error.message);
@@ -361,7 +370,8 @@ export const useTripStore = create<TripStore>()(
           const { error } = await (supabase as any)
             .from('active_trips')
             .update(updateData)
-            .eq('id', activeTrip.id);
+            .eq('id', activeTrip.id)
+            .eq('driver_id', activeTrip.driver_id);
 
           if (error) {
             throw new Error(error.message);
@@ -418,7 +428,8 @@ export const useTripStore = create<TripStore>()(
           const { error: deleteError } = await (supabase as any)
             .from('active_trips')
             .delete()
-            .eq('id', activeTrip.id);
+            .eq('id', activeTrip.id)
+            .eq('driver_id', activeTrip.driver_id);
 
           if (deleteError) {
             throw new Error(deleteError.message);
@@ -451,6 +462,53 @@ export const useTripStore = create<TripStore>()(
           set({ error, isEndingTrip: false });
           return { success: false, error };
         }
+      },
+
+      fetchMyActiveTrip: async (driverId: string) => {
+        try {
+          // fetch only the driver's own active trip, not other drivers' trips
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data, error } = await (supabase as any)
+            .from('active_trips')
+            .select(`
+              *,
+              vehicle:vehicles(*),
+              route:routes(*)
+            `)
+            .eq('driver_id', driverId)
+            .maybeSingle();
+
+          if (error) {
+            console.error('Error fetching my active trip:', error);
+            return { success: false, error: new Error(error.message) };
+          }
+
+          if (data) {
+            // restore the trip and route from database
+            set({
+              activeTrip: data,
+              selectedRoute: data.route || null,
+              vehicle: data.vehicle || null,
+              tripStartTime: new Date(data.started_at).getTime(),
+            });
+          } else {
+            // no active trip for this driver, clear any stale data
+            set({
+              activeTrip: null,
+              tripStartTime: null,
+            });
+          }
+
+          return { success: true };
+        } catch (err) {
+          return { success: false, error: err as Error };
+        }
+      },
+
+      clearForLogout: async () => {
+        // completely clear trip state and persisted storage on logout
+        set(initialState);
+        await AsyncStorage.removeItem('jeepneygo-trip');
       },
 
       clearError: () => set({ error: null }),
