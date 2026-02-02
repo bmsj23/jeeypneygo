@@ -3,6 +3,7 @@ import { createJSONStorage, persist, type StateStorage } from 'zustand/middlewar
 import * as SecureStore from 'expo-secure-store';
 import type { User, AuthState } from '../types/models';
 import { supabase } from '../services/supabase';
+import { useTripStore } from './trip-store';
 
 const secureStorage: StateStorage = {
   getItem: async (name: string) => {
@@ -36,31 +37,77 @@ export const useAuthStore = create<AuthStore>()(
       isAuthenticated: false,
 
       initialize: async () => {
+        // timeout to prevent infinite loading on corrupted device storage
+        const initTimeout = setTimeout(() => {
+          console.warn('Auth initialization timed out, clearing state');
+          set({ isLoading: false, user: null, session: null, isAuthenticated: false });
+        }, 10000);
+
+        // helper to get or create user profile
+        const getOrCreateProfile = async (authUser: { id: string; email?: string | null; phone?: string | null; user_metadata?: Record<string, unknown> }) => {
+          const { data: profile, error: profileError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUser.id)
+            .single();
+
+          if (profile) {
+            return profile;
+          }
+
+          // profile doesn't exist, create it
+          if (profileError?.code === 'PGRST116') {
+            const displayName = (authUser.user_metadata?.display_name as string) || authUser.email?.split('@')[0] || 'User';
+            const newProfile = {
+              id: authUser.id,
+              email: authUser.email ?? null,
+              phone: authUser.phone ?? null,
+              display_name: displayName,
+              role: 'commuter' as const,
+              is_approved: true,
+              avatar_url: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data: createdProfile, error: insertError } = await (supabase as any)
+              .from('users')
+              .insert(newProfile)
+              .select()
+              .single();
+
+            if (insertError) {
+              console.warn('Could not create user profile:', insertError.message);
+              return newProfile;
+            }
+
+            return createdProfile || newProfile;
+          }
+
+          // other error, use fallback
+          console.error('Error fetching user profile:', profileError);
+          return {
+            id: authUser.id,
+            email: authUser.email ?? null,
+            phone: authUser.phone ?? null,
+            display_name: authUser.email?.split('@')[0] || 'User',
+            role: 'commuter' as const,
+            is_approved: true,
+            avatar_url: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+        };
+
         try {
           supabase.auth.onAuthStateChange(async (event, session) => {
+            clearTimeout(initTimeout);
             if (event === 'SIGNED_IN' && session?.user) {
-              const { data: profile, error: profileError } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-
-              if (profileError) {
-                console.error('Error fetching user profile:', profileError);
-              }
+              const profile = await getOrCreateProfile(session.user);
 
               set({
-                user: profile || {
-                  id: session.user.id,
-                  email: session.user.email ?? null,
-                  phone: session.user.phone ?? null,
-                  display_name: session.user.email?.split('@')[0] || 'User',
-                  role: 'commuter',
-                  is_approved: false,
-                  avatar_url: null,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                },
+                user: profile,
                 session: {
                   access_token: session.access_token,
                   refresh_token: session.refresh_token,
@@ -78,30 +125,13 @@ export const useAuthStore = create<AuthStore>()(
           });
 
           const { data: { session } } = await supabase.auth.getSession();
+          clearTimeout(initTimeout);
 
           if (session?.user) {
-            const { data: profile, error: profileError } = await supabase
-              .from('users')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-
-            if (profileError) {
-              console.error('Error fetching user profile on init:', profileError);
-            }
+            const profile = await getOrCreateProfile(session.user);
 
             set({
-              user: profile || {
-                id: session.user.id,
-                email: session.user.email ?? null,
-                phone: session.user.phone ?? null,
-                display_name: session.user.email?.split('@')[0] || 'User',
-                role: 'commuter',
-                is_approved: false,
-                avatar_url: null,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              },
+              user: profile,
               session: {
                 access_token: session.access_token,
                 refresh_token: session.refresh_token,
@@ -130,6 +160,7 @@ export const useAuthStore = create<AuthStore>()(
             }
           }
         } catch (error) {
+          clearTimeout(initTimeout);
           console.error('Auth initialization error:', error);
           set({ isLoading: false });
         }
@@ -285,6 +316,8 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       signOut: async () => {
+        // clear trip store data first to prevent cross-driver sync issues
+        await useTripStore.getState().clearForLogout();
         await supabase.auth.signOut();
         set({
           user: null,
