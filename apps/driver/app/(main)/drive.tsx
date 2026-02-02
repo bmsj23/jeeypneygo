@@ -67,12 +67,13 @@ export default function DriveScreen() {
     logCustomFare,
     undoLastFare,
     decrementPassenger,
+    fetchMyActiveTrip,
   } = useTripStore();
 
   const { routes, isLoading: routesLoading } = useRoutes();
   const { vehicle, isLoading: vehicleLoading } = useDriverVehicle(user?.id);
   const { isOnline } = useNetworkStatus();
-  const { trips: otherDrivers } = useActiveTrips({
+  const { trips: otherDrivers, connectionState: realtimeState } = useActiveTrips({
     routeId: activeTrip?.route_id || selectedRoute?.id || undefined,
   });
 
@@ -84,19 +85,24 @@ export default function DriveScreen() {
   const [pendingRoute, setPendingRoute] = useState<Route | null>(null);
   const [isGoOnlinePressed, setIsGoOnlinePressed] = useState(false);
   const [isFareEntryMode, setIsFareEntryMode] = useState(false);
+  const [isTripValidated, setIsTripValidated] = useState(false);
 
   const shouldTrackLocation = driveState !== 'summary';
   const activeTripRef = useRef(activeTrip);
   const updateLocationRef = useRef(updateLocation);
+  const userIdRef = useRef(user?.id);
 
   useEffect(() => {
     activeTripRef.current = activeTrip;
     updateLocationRef.current = updateLocation;
+    userIdRef.current = user?.id;
   });
 
   const handleLocationUpdate = useCallback(
     (location: { latitude: number; longitude: number; heading: number; speed: number }) => {
-      if (activeTripRef.current) {
+      const currentTrip = activeTripRef.current;
+      const currentUserId = userIdRef.current;
+      if (currentTrip && currentUserId && currentTrip.driver_id === currentUserId) {
         updateLocationRef.current(location.latitude, location.longitude, location.heading, location.speed);
       }
     },
@@ -120,6 +126,31 @@ export default function DriveScreen() {
       setVehicle(vehicle);
     }
   }, [vehicle, setVehicle]);
+
+  // verify that any persisted active trip actually belongs to this driver
+  // prevents bug where driver a sees driver b's trip after switching accounts
+  useEffect(() => {
+    const validateTrip = async () => {
+      if (!user?.id) {
+        setIsTripValidated(false);
+        return;
+      }
+
+      if (activeTrip && activeTrip.driver_id !== user.id) {
+        setIsTripValidated(false);
+        await fetchMyActiveTrip(user.id);
+        setIsTripValidated(true);
+      } else if (!activeTrip) {
+        setIsTripValidated(false);
+        await fetchMyActiveTrip(user.id);
+        setIsTripValidated(true);
+      } else {
+        setIsTripValidated(true);
+      }
+    };
+
+    validateTrip();
+  }, [user?.id, activeTrip?.driver_id, fetchMyActiveTrip]);
 
   useEffect(() => {
     if (activeTrip) {
@@ -453,6 +484,13 @@ export default function DriveScreen() {
         <View style={[styles.offlineBanner, { top: insets.top + 60, backgroundColor: theme.colors.errorContainer }]}>
           <MaterialCommunityIcons name="wifi-off" size={16} color={theme.colors.error} />
           <Text style={[styles.offlineText, { color: theme.colors.onErrorContainer }]}>Offline</Text>
+        </View>
+      )}
+
+      {isOnline && realtimeState === 'error' && (
+        <View style={[styles.offlineBanner, { top: insets.top + 60, backgroundColor: '#FFF3E0' }]}>
+          <MaterialCommunityIcons name="sync-alert" size={16} color="#E65100" />
+          <Text style={[styles.offlineText, { color: '#E65100' }]}>Syncing...</Text>
         </View>
       )}
 
