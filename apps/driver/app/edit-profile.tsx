@@ -7,7 +7,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useAuthStore } from '@jeepneygo/core';
+import * as FileSystem from 'expo-file-system/legacy';
+import { useAuthStore, uploadAvatarFromBase64 } from '@jeepneygo/core';
 import {
   AvatarSection,
   ProfileForm,
@@ -29,7 +30,10 @@ export default function EditProfileScreen() {
   const user = useAuthStore((state) => state.user);
 
   const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatar_url || null);
+  const [originalAvatarUri] = useState<string | null>(user?.avatar_url || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const avatarChanged = avatarUri !== originalAvatarUri;
 
   const {
     control,
@@ -47,12 +51,30 @@ export default function EditProfileScreen() {
   const onSubmit = async (data: ProfileFormData) => {
     setIsSubmitting(true);
     try {
+      let finalAvatarUrl = avatarUri;
+
+      // upload avatar to supabase storage if it's a local file
+      if (avatarUri && (avatarUri.startsWith('file://') || avatarUri.startsWith('ph://')) && user?.id) {
+        const base64 = await FileSystem.readAsStringAsync(avatarUri, {
+          encoding: 'base64',
+        });
+        const extension = avatarUri.split('.').pop()?.toLowerCase() || 'jpg';
+        
+        const { url, error: uploadError } = await uploadAvatarFromBase64(user.id, base64, extension);
+        if (uploadError) {
+          Alert.alert('Error', 'Failed to upload profile picture. Please try again.');
+          setIsSubmitting(false);
+          return;
+        }
+        finalAvatarUrl = url;
+      }
+
       const updateProfile = useAuthStore.getState().updateProfile;
       const { error } = await updateProfile({
         display_name: data.displayName,
         phone: data.phone || undefined,
         email: data.email || undefined,
-        avatar_url: avatarUri || undefined,
+        avatar_url: finalAvatarUrl || undefined,
       });
 
       if (error) {
