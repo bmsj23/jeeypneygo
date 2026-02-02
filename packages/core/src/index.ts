@@ -25,5 +25,6 @@ export * from './hooks/use-driver-spacing';
 export * from './utils/eta-calculator';
 export * from './utils/fare-calculator';
 export * from './utils/driver-spacing';
+export * from './utils/avatar-upload';
 
 export * from './providers/query-provider';
